@@ -1,5 +1,5 @@
-import db from "@/lib/db";
 import { NextRequest, NextResponse } from "next/server";
+import prisma from "@/lib/prisma";
 import { authenticate, hasEventAccess } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
@@ -10,7 +10,10 @@ export async function GET(req: NextRequest) {
   if (!eventId) return NextResponse.json({ error: "event_id required" }, { status: 400 });
   if (!hasEventAccess(user, Number(eventId))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const cols = db.prepare("SELECT * FROM ColumnConfig WHERE event_id = ? ORDER BY sort_order").all(Number(eventId));
+  const cols = await prisma.columnConfig.findMany({
+    where: { event_id: Number(eventId) },
+    orderBy: { sort_order: "asc" },
+  });
   return NextResponse.json(cols);
 }
 
@@ -22,9 +25,15 @@ export async function POST(req: NextRequest) {
   if (!event_id || !status_id || !label) return NextResponse.json({ error: "event_id, status_id, label required" }, { status: 400 });
   if (!hasEventAccess(user, Number(event_id))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const maxSort = db.prepare("SELECT COALESCE(MAX(sort_order), -1) + 1 AS next FROM ColumnConfig WHERE event_id = ?").get(event_id) as any;
-  const result = db.prepare("INSERT INTO ColumnConfig (event_id, status_id, label, color, sort_order) VALUES (?, ?, ?, ?, ?)").run(event_id, status_id, label, color || '#94a3b8', maxSort.next);
-  return NextResponse.json({ id: result.lastInsertRowid });
+  const maxSort = await prisma.columnConfig.aggregate({
+    where: { event_id: Number(event_id) },
+    _max: { sort_order: true },
+  });
+  const nextSort = (maxSort._max.sort_order ?? -1) + 1;
+  const result = await prisma.columnConfig.create({
+    data: { event_id: Number(event_id), status_id, label, color: color || "#94a3b8", sort_order: nextSort },
+  });
+  return NextResponse.json({ id: result.id });
 }
 
 export async function PUT(req: NextRequest) {
@@ -34,11 +43,15 @@ export async function PUT(req: NextRequest) {
   const { id, label, color, sort_order } = await req.json();
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
 
-  const col = db.prepare("SELECT event_id FROM ColumnConfig WHERE id = ?").get(Number(id)) as any;
+  const col = await prisma.columnConfig.findUnique({ where: { id: Number(id) }, select: { event_id: true } });
   if (!col) return NextResponse.json({ error: "not found" }, { status: 404 });
   if (!hasEventAccess(user, col.event_id)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  db.prepare("UPDATE ColumnConfig SET label = COALESCE(?, label), color = COALESCE(?, color), sort_order = COALESCE(?, sort_order) WHERE id = ?").run(label, color, sort_order, id);
+  const data: any = {};
+  if (label !== undefined) data.label = label;
+  if (color !== undefined) data.color = color;
+  if (sort_order !== undefined) data.sort_order = sort_order;
+  await prisma.columnConfig.update({ where: { id: Number(id) }, data });
   return NextResponse.json({ ok: true });
 }
 
@@ -49,10 +62,10 @@ export async function DELETE(req: NextRequest) {
   const id = req.nextUrl.searchParams.get("id");
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
 
-  const col = db.prepare("SELECT * FROM ColumnConfig WHERE id = ?").get(Number(id)) as any;
+  const col = await prisma.columnConfig.findUnique({ where: { id: Number(id) } });
   if (!col) return NextResponse.json({ error: "not found" }, { status: 404 });
   if (!hasEventAccess(user, col.event_id)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  db.prepare("DELETE FROM ColumnConfig WHERE id = ?").run(Number(id));
+  await prisma.columnConfig.delete({ where: { id: Number(id) } });
   return NextResponse.json({ ok: true });
 }

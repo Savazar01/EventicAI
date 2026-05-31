@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import db from "@/lib/db";
+import prisma from "@/lib/prisma";
 import { authenticate, hasEventAccess, getEventIdFromActivity } from "@/lib/auth";
 
 export async function POST(request: Request) {
@@ -10,12 +10,12 @@ export async function POST(request: Request) {
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
   const activityId = Number(id);
-  const eventId = getEventIdFromActivity(activityId);
+  const eventId = await getEventIdFromActivity(activityId);
   if (!eventId) return NextResponse.json({ error: "Activity not found" }, { status: 404 });
   if (!hasEventAccess(user, eventId)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  db.prepare("UPDATE Activity SET completed = 0, progress_status = 'in-progress' WHERE id = ?").run(activityId);
-  db.prepare("UPDATE Activity SET completed = 0, progress_status = 'in-progress' WHERE parent_activity_id = ?").run(activityId);
+  await prisma.activity.update({ where: { id: activityId }, data: { completed: 0, progress_status: "in-progress" } });
+  await prisma.activity.updateMany({ where: { parent_activity_id: activityId }, data: { completed: 0, progress_status: "in-progress" } });
 
   return NextResponse.json({ success: true });
 }

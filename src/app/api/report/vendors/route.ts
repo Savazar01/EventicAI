@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import db from "@/lib/db";
+import prisma from "@/lib/prisma";
 import { authenticate, hasEventAccess } from "@/lib/auth";
 
 export async function GET(request: Request) {
@@ -12,35 +12,33 @@ export async function GET(request: Request) {
   const sort = searchParams.get("sort") || "business_name";
   const order = searchParams.get("order") || "asc";
 
-  let where = "";
-  const params: any[] = [];
-
+  const where: any = {};
   if (event_id) {
     if (!hasEventAccess(user, Number(event_id))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    where = "WHERE a.event_id = ?";
-    params.push(Number(event_id));
+    where.activity = { event_id: Number(event_id) };
   }
-
   if (service) {
-    where += where ? " AND v.services LIKE ?" : "WHERE v.services LIKE ?";
-    params.push(`%${service}%`);
+    where.services = { contains: service };
   }
 
-  const sortCol =
-    sort === "activity" ? "a.title" :
-    sort === "service" ? "v.services" :
-    "v.business_name";
+  const orderBy: any = {};
+  if (sort === "activity") orderBy.activity = { title: order };
+  else if (sort === "service") orderBy.services = order;
+  else orderBy.business_name = order;
 
-  const dir = order === "desc" ? "DESC" : "ASC";
+  const vendors = await prisma.vendor.findMany({
+    where,
+    orderBy,
+    include: { activity: { select: { title: true, event_id: true } } },
+  });
 
-  const vendors = db.prepare(`
-    SELECT v.id, v.business_name, v.whatsapp, v.services,
-      COALESCE(a.title, '') as activity_title,
-      a.event_id
-    FROM Vendor v
-    LEFT JOIN Activity a ON v.activity_id = a.id
-    ${where}
-    ORDER BY ${sortCol} ${dir}
-  `).all(...params);
-  return NextResponse.json(vendors);
+  const result = vendors.map((v) => ({
+    id: v.id,
+    business_name: v.business_name,
+    whatsapp: v.whatsapp,
+    services: v.services,
+    activity_title: v.activity.title || "",
+    event_id: v.activity.event_id,
+  }));
+  return NextResponse.json(result);
 }

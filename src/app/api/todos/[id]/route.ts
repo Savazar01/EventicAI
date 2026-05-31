@@ -1,28 +1,22 @@
 import { NextResponse } from "next/server";
-import db from "@/lib/db";
+import prisma from "@/lib/prisma";
 import { authenticate } from "@/lib/auth";
 
-export async function PUT(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const [user, err] = await authenticate();
   if (err) return err;
 
   const { id } = await params;
   const { status } = await request.json();
-  db.prepare("UPDATE Todo SET status = ? WHERE id = ?").run(status, id);
-  return NextResponse.json({ id, status });
+  await prisma.todo.update({ where: { id: Number(id) }, data: { status } });
+  return NextResponse.json({ id: Number(id), status });
 }
 
-export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const [user, err] = await authenticate();
   if (err) return err;
 
   const { id } = await params;
-  db.prepare("DELETE FROM Todo WHERE id = ?").run(id);
+  await prisma.todo.delete({ where: { id: Number(id) } });
   return NextResponse.json({ message: "Deleted" });
 }

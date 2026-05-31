@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import db from "@/lib/db";
+import prisma from "@/lib/prisma";
 import { withErrorHandler } from "@/lib/api-handler";
 import { authenticate, hasEventAccess } from "@/lib/auth";
 
@@ -7,53 +7,91 @@ export const GET = withErrorHandler(async (req, context) => {
   const [user, err] = await authenticate();
   if (err) return err;
 
-  let whereClause = "";
-  const params: any[] = [];
-
+  const where: any = {};
   if (user.role === "event_user") {
     try {
       const ids: number[] = JSON.parse(user.event_ids || "[]");
       if (ids.length === 0) return NextResponse.json([]);
-      whereClause = "WHERE e.id IN (" + ids.map(() => "?").join(",") + ")";
-      for (const id of ids) params.push(id);
+      where.id = { in: ids };
     } catch {
       return NextResponse.json([]);
     }
   }
 
-  const events = db.prepare(`
-    SELECT e.*, tm.name as event_owner_name,
-      (SELECT COUNT(*) FROM Activity WHERE event_id = e.id AND parent_activity_id IS NULL) as parent_activity_count,
-      (SELECT COUNT(*) FROM Activity WHERE event_id = e.id AND parent_activity_id IS NOT NULL) as sub_activity_count,
-      (SELECT COUNT(*) FROM Guest WHERE event_id = e.id) as event_guest_count,
-      (SELECT COUNT(*) FROM Guest g JOIN Activity a ON g.activity_id = a.id WHERE a.event_id = e.id) as activity_guest_count,
-      (SELECT COALESCE(SUM(g.guest_count), 0) FROM Guest g LEFT JOIN Activity a ON g.activity_id = a.id WHERE (g.event_id = e.id OR a.event_id = e.id) AND g.status = 'Attending') as attending_total,
-      (SELECT COALESCE(SUM(g.guest_count), 0) FROM Guest g LEFT JOIN Activity a ON g.activity_id = a.id WHERE (g.event_id = e.id OR a.event_id = e.id) AND g.status = 'Maybe') as maybe_total,
-      (SELECT COALESCE(SUM(g.guest_count), 0) FROM Guest g LEFT JOIN Activity a ON g.activity_id = a.id WHERE (g.event_id = e.id OR a.event_id = e.id) AND g.status = 'No') as no_total,
-      (SELECT COALESCE(SUM(g.guest_count), 0) FROM Guest g LEFT JOIN Activity a ON g.activity_id = a.id WHERE (g.event_id = e.id OR a.event_id = e.id)) as total_guest_count,
-      (SELECT COUNT(*) FROM Vendor v JOIN Activity a ON v.activity_id = a.id WHERE a.event_id = e.id) as vendor_count,
-      (SELECT COALESCE(
-        '[' || GROUP_CONCAT(
-          '{"status":"' || cc.status_id || '","label":"' || REPLACE(cc.label, '"', '\\"') ||
-          '","color":"' || cc.color ||
-          '","open":' || COALESCE(a.open_cnt, 0) || ',"in_progress":' || COALESCE(a.ip_cnt, 0) || ',"done":' || COALESCE(a.done_cnt, 0) || '}'
-        , ',') || ']', '[]')
-        FROM ColumnConfig cc
-        LEFT JOIN (
-          SELECT a.status,
-            SUM(CASE WHEN (a.progress_status IS NULL OR a.progress_status = '') AND a.completed = 0 THEN 1 ELSE 0 END) as open_cnt,
-            SUM(CASE WHEN a.progress_status = 'in-progress' THEN 1 ELSE 0 END) as ip_cnt,
-            SUM(CASE WHEN a.progress_status = 'done' OR a.completed = 1 THEN 1 ELSE 0 END) as done_cnt
-          FROM Activity a WHERE a.event_id = e.id GROUP BY a.status
-        ) a ON a.status = cc.status_id
-        WHERE cc.event_id = e.id
-        ORDER BY cc.sort_order
-      ) as activity_status_breakdown
-    FROM Event e LEFT JOIN TeamMember tm ON e.event_owner_id = tm.id
-    ${whereClause}
-    ORDER BY e.start_date DESC
-  `).all(...params);
-  return NextResponse.json(events);
+  const events = await prisma.event.findMany({
+    where,
+    include: {
+      event_owner: { select: { name: true } },
+      _count: {
+        select: {
+          activities: true,
+          guests: true,
+          locations: true,
+          columnConfigs: true,
+        },
+      },
+    },
+    orderBy: { start_date: "desc" },
+  });
+
+  const result = await Promise.all(events.map(async (e) => {
+    const parentCount = await prisma.activity.count({ where: { event_id: e.id, parent_activity_id: null } });
+    const subCount = await prisma.activity.count({ where: { event_id: e.id, parent_activity_id: { not: null } } });
+
+    const attendingGuests = await prisma.guest.aggregate({
+      where: { OR: [{ event_id: e.id }, { activity: { event_id: e.id } }], status: "Attending" },
+      _sum: { guest_count: true },
+    });
+    const maybeGuests = await prisma.guest.aggregate({
+      where: { OR: [{ event_id: e.id }, { activity: { event_id: e.id } }], status: "Maybe" },
+      _sum: { guest_count: true },
+    });
+    const noGuests = await prisma.guest.aggregate({
+      where: { OR: [{ event_id: e.id }, { activity: { event_id: e.id } }], status: "No" },
+      _sum: { guest_count: true },
+    });
+    const totalGuests = await prisma.guest.aggregate({
+      where: { OR: [{ event_id: e.id }, { activity: { event_id: e.id } }] },
+      _sum: { guest_count: true },
+    });
+    const vendorCount = await prisma.vendor.count({ where: { activity: { event_id: e.id } } });
+    const guestCountAtEvent = await prisma.guest.count({ where: { event_id: e.id } });
+
+    const columns = await prisma.columnConfig.findMany({
+      where: { event_id: e.id },
+      orderBy: { sort_order: "asc" },
+    });
+
+    const columnStatuses = await Promise.all(columns.map(async (cc) => {
+      const openCnt = await prisma.activity.count({
+        where: { event_id: e.id, status: cc.status_id, completed: 0, OR: [{ progress_status: null }, { progress_status: "" }] },
+      });
+      const ipCnt = await prisma.activity.count({
+        where: { event_id: e.id, status: cc.status_id, progress_status: "in-progress" },
+      });
+      const doneCnt = await prisma.activity.count({
+        where: { event_id: e.id, status: cc.status_id, OR: [{ progress_status: "done" }, { completed: 1 }] },
+      });
+      return { status: cc.status_id, label: cc.label, color: cc.color, open: openCnt, in_progress: ipCnt, done: doneCnt };
+    }));
+
+    return {
+      ...e,
+      event_owner_name: e.event_owner?.name || null,
+      parent_activity_count: parentCount,
+      sub_activity_count: subCount,
+      event_guest_count: guestCountAtEvent,
+      activity_guest_count: e._count.activities - parentCount,
+      attending_total: attendingGuests._sum.guest_count || 0,
+      maybe_total: maybeGuests._sum.guest_count || 0,
+      no_total: noGuests._sum.guest_count || 0,
+      total_guest_count: totalGuests._sum.guest_count || 0,
+      vendor_count: vendorCount,
+      activity_status_breakdown: columnStatuses,
+    };
+  }));
+
+  return NextResponse.json(result);
 });
 
 export const POST = withErrorHandler(async (request: Request) => {
@@ -64,10 +102,15 @@ export const POST = withErrorHandler(async (request: Request) => {
   }
 
   const { title, description, start_date, end_date, location, contact, event_budget, event_effort_hours, event_owner_id, payment_bank_name, payment_account_number, payment_ifsc_code, payment_qr_code } = await request.json();
-  const stmt = db.prepare(`
-    INSERT INTO Event (title, description, start_date, end_date, location, contact, event_budget, event_effort_hours, event_owner_id, payment_bank_name, payment_account_number, payment_ifsc_code, payment_qr_code)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  const info = stmt.run(title, description, start_date, end_date, location, contact, event_budget ?? null, event_effort_hours ?? null, event_owner_id ?? null, payment_bank_name ?? '', payment_account_number ?? '', payment_ifsc_code ?? '', payment_qr_code ?? '');
-  return NextResponse.json({ id: Number(info.lastInsertRowid), title, description, start_date, end_date, location, contact, event_budget, event_effort_hours, event_owner_id, payment_bank_name, payment_account_number, payment_ifsc_code, payment_qr_code });
+  const created = await prisma.event.create({
+    data: {
+      title, description, start_date: new Date(start_date), end_date: new Date(end_date),
+      location, contact,
+      event_budget: event_budget ?? null, event_effort_hours: event_effort_hours ?? null,
+      event_owner_id: event_owner_id ?? null,
+      payment_bank_name: payment_bank_name ?? "", payment_account_number: payment_account_number ?? "",
+      payment_ifsc_code: payment_ifsc_code ?? "", payment_qr_code: payment_qr_code ?? "",
+    },
+  });
+  return NextResponse.json(created);
 });

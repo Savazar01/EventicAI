@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import db from "@/lib/db";
+import prisma from "@/lib/prisma";
 import { authenticate, hasEventAccess } from "@/lib/auth";
 
 export async function GET(request: Request) {
@@ -13,45 +13,41 @@ export async function GET(request: Request) {
   const sort = searchParams.get("sort") || "name";
   const order = searchParams.get("order") || "asc";
 
-  let where = "";
-  const params: any[] = [];
-
+  const where: any = {};
   if (event_id) {
     if (!hasEventAccess(user, Number(event_id))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    where = "WHERE (g.event_id = ? OR a.event_id = ?)";
-    params.push(Number(event_id), Number(event_id));
+    where.OR = [{ event_id: Number(event_id) }, { activity: { event_id: Number(event_id) } }];
   }
+  if (status) where.status = status;
+  if (level === "event") where.event_id = { not: null };
+  else if (level === "activity") where.activity_id = { not: null };
 
-  if (status) {
-    where += where ? " AND g.status = ?" : "WHERE g.status = ?";
-    params.push(status);
-  }
+  const orderBy: any = {};
+  if (sort === "event") orderBy.event = { title: order };
+  else if (sort === "activity") orderBy.activity = { title: order };
+  else if (sort === "status") orderBy.status = order;
+  else if (sort === "guest_count") orderBy.guest_count = order;
+  else orderBy.name = order;
 
-  if (level === "event") {
-    where += where ? " AND g.event_id IS NOT NULL" : "WHERE g.event_id IS NOT NULL";
-  } else if (level === "activity") {
-    where += where ? " AND g.activity_id IS NOT NULL" : "WHERE g.activity_id IS NOT NULL";
-  }
+  const guests = await prisma.guest.findMany({
+    where,
+    orderBy,
+    include: {
+      event: { select: { id: true, title: true } },
+      activity: { select: { id: true, title: true, event_id: true } },
+    },
+  });
 
-  const sortCol = sort === "event" ? "e.title" :
-    sort === "activity" ? "a.title" :
-    sort === "status" ? "g.status" :
-    sort === "guest_count" ? "g.guest_count" :
-    "g.name";
-
-  const dir = order === "desc" ? "DESC" : "ASC";
-
-  const guests = db.prepare(`
-    SELECT g.id, g.name, g.whatsapp, g.guest_count, g.status,
-      CASE WHEN g.event_id IS NOT NULL THEN 'Event' ELSE 'Activity' END as level,
-      COALESCE(e.title, '') as event_title,
-      COALESCE(a.title, '') as activity_title,
-      COALESCE(e.id, a.event_id) as event_id
-    FROM Guest g
-    LEFT JOIN Event e ON g.event_id = e.id
-    LEFT JOIN Activity a ON g.activity_id = a.id
-    ${where}
-    ORDER BY ${sortCol} ${dir}
-  `).all(...params);
-  return NextResponse.json(guests);
+  const result = guests.map((g) => ({
+    id: g.id,
+    name: g.name,
+    whatsapp: g.whatsapp,
+    guest_count: g.guest_count,
+    status: g.status,
+    level: g.event_id ? "Event" : "Activity",
+    event_title: g.event?.title || "",
+    activity_title: g.activity?.title || "",
+    event_id: g.event?.id || g.activity?.event_id || null,
+  }));
+  return NextResponse.json(result);
 }

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import db from "@/lib/db";
+import prisma from "@/lib/prisma";
 import { authenticate, requireRole } from "@/lib/auth";
 
 export async function GET() {
@@ -8,7 +8,7 @@ export async function GET() {
   const roleErr = requireRole(user, ["savadmin"]);
   if (roleErr) return roleErr;
 
-  const row = db.prepare("SELECT * FROM PaymentInfo LIMIT 1").get() as any;
+  const row = await prisma.paymentInfo.findFirst();
   return NextResponse.json(row || null);
 }
 
@@ -19,14 +19,17 @@ export async function POST(request: Request) {
   if (roleErr) return roleErr;
 
   const { bank_name, account_number, ifsc_code, qr_code } = await request.json();
-  const existing = db.prepare("SELECT id FROM PaymentInfo LIMIT 1").get() as any;
+  const existing = await prisma.paymentInfo.findFirst({ select: { id: true } });
   if (existing) {
-    db.prepare("UPDATE PaymentInfo SET bank_name = ?, account_number = ?, ifsc_code = ?, qr_code = ? WHERE id = ?")
-      .run(bank_name || '', account_number || '', ifsc_code || '', qr_code || '', existing.id);
+    await prisma.paymentInfo.update({
+      where: { id: existing.id },
+      data: { bank_name: bank_name || "", account_number: account_number || "", ifsc_code: ifsc_code || "", qr_code: qr_code || "" },
+    });
     return NextResponse.json({ success: true });
   } else {
-    db.prepare("INSERT INTO PaymentInfo (bank_name, account_number, ifsc_code, qr_code) VALUES (?, ?, ?, ?)")
-      .run(bank_name || '', account_number || '', ifsc_code || '', qr_code || '');
+    await prisma.paymentInfo.create({
+      data: { bank_name: bank_name || "", account_number: account_number || "", ifsc_code: ifsc_code || "", qr_code: qr_code || "" },
+    });
     return NextResponse.json({ success: true });
   }
 }

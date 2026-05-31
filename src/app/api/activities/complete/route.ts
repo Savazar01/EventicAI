@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import db from "@/lib/db";
+import prisma from "@/lib/prisma";
 import { authenticate, hasEventAccess, getEventIdFromActivity } from "@/lib/auth";
 
 export async function POST(request: Request) {
@@ -10,40 +10,31 @@ export async function POST(request: Request) {
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
   const activityId = Number(id);
-  const eventId = getEventIdFromActivity(activityId);
+  const eventId = await getEventIdFromActivity(activityId);
   if (!eventId) return NextResponse.json({ error: "Activity not found" }, { status: 404 });
   if (!hasEventAccess(user, eventId)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const now = new Date().toISOString();
 
-  const sets = ["completed = 1", "progress_status = 'done'", "completed_at = ?"];
-  const params: any[] = [now];
+  const data: Record<string, unknown> = {
+    completed: 1,
+    progress_status: "done",
+    completed_at: now,
+  };
+  if (note !== undefined && note !== null) data.completion_note = note;
+  if (actual_effort_hours !== undefined && actual_effort_hours !== null) data.actual_effort_hours = Number(actual_effort_hours);
+  if (actual_budget !== undefined && actual_budget !== null) data.actual_budget = Number(actual_budget);
+  if (currency !== undefined && currency !== null) data.currency = currency;
 
-  if (note !== undefined && note !== null) {
-    sets.push("completion_note = ?");
-    params.push(note);
-  }
-  if (actual_effort_hours !== undefined && actual_effort_hours !== null) {
-    sets.push("actual_effort_hours = ?");
-    params.push(Number(actual_effort_hours));
-  }
-  if (actual_budget !== undefined && actual_budget !== null) {
-    sets.push("actual_budget = ?");
-    params.push(Number(actual_budget));
-  }
-  if (currency !== undefined && currency !== null) {
-    sets.push("currency = ?");
-    params.push(currency);
-  }
+  await prisma.activity.update({ where: { id: activityId }, data });
 
-  params.push(activityId);
-  db.prepare(`UPDATE Activity SET ${sets.join(", ")} WHERE id = ?`).run(...params);
-
-  const subParams: any[] = [now];
-  const subSets = ["completed = 1", "progress_status = 'done'", "completed_at = ?"];
-  if (note) { subSets.push("completion_note = ?"); subParams.push(note); }
-  subParams.push(activityId);
-  db.prepare(`UPDATE Activity SET ${subSets.join(", ")} WHERE parent_activity_id = ?`).run(...subParams);
+  const subData: Record<string, unknown> = {
+    completed: 1,
+    progress_status: "done",
+    completed_at: now,
+  };
+  if (note) subData.completion_note = note;
+  await prisma.activity.updateMany({ where: { parent_activity_id: activityId }, data: subData });
 
   return NextResponse.json({ success: true });
 }

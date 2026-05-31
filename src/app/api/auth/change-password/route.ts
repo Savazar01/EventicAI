@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, verifyPassword, hashPassword, deleteAllSessions, clearSessionCookie, createSession, setSessionCookie } from "@/lib/auth";
-import db from "@/lib/db";
+import prisma from "@/lib/prisma";
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
@@ -16,14 +16,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "New password must be at least 6 characters" }, { status: 400 });
   }
 
-  const row = db.prepare("SELECT password FROM TeamMember WHERE id = ?").get(user.id) as any;
-  const valid = await verifyPassword(current_password, row.password);
+  const row = await prisma.teamMember.findUnique({ where: { id: user.id }, select: { password: true } });
+  const valid = await verifyPassword(current_password, row!.password!);
   if (!valid) {
     return NextResponse.json({ error: "Current password is incorrect" }, { status: 401 });
   }
 
   const newHash = await hashPassword(new_password);
-  db.prepare("UPDATE TeamMember SET password = ?, force_password_change = 0 WHERE id = ?").run(newHash, user.id);
+  await prisma.teamMember.update({ where: { id: user.id }, data: { password: newHash, force_password_change: 0 } });
 
   const newToken = await createSession(user.id);
   await setSessionCookie(newToken);

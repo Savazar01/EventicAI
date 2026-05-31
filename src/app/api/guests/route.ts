@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import db from "@/lib/db";
+import prisma from "@/lib/prisma";
 import { authenticate, hasEventAccess, getEventIdFromActivity } from "@/lib/auth";
 
 export async function GET(request: Request) {
@@ -13,15 +13,15 @@ export async function GET(request: Request) {
   if (event_id) {
     const eventId = Number(event_id);
     if (!hasEventAccess(user, eventId)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    const guests = db.prepare("SELECT * FROM Guest WHERE event_id = ?").all(eventId);
+    const guests = await prisma.guest.findMany({ where: { event_id: eventId } });
     return NextResponse.json(guests);
   }
   if (activity_id) {
     const activityId = Number(activity_id);
-    const eventId = getEventIdFromActivity(activityId);
+    const eventId = await getEventIdFromActivity(activityId);
     if (!eventId) return NextResponse.json({ error: "Activity not found" }, { status: 404 });
     if (!hasEventAccess(user, eventId)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    const guests = db.prepare("SELECT * FROM Guest WHERE activity_id = ?").all(activityId);
+    const guests = await prisma.guest.findMany({ where: { activity_id: activityId } });
     return NextResponse.json(guests);
   }
   return NextResponse.json({ error: "Missing activity_id or event_id" }, { status: 400 });
@@ -36,18 +36,20 @@ export async function POST(request: Request) {
   if (!name) return NextResponse.json({ error: "Missing name" }, { status: 400 });
 
   if (activity_id) {
-    const eventId = getEventIdFromActivity(Number(activity_id));
+    const eventId = await getEventIdFromActivity(Number(activity_id));
     if (!eventId) return NextResponse.json({ error: "Activity not found" }, { status: 404 });
     if (!hasEventAccess(user, eventId)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    const stmt = db.prepare("INSERT INTO Guest (activity_id, name, whatsapp, guest_count, status) VALUES (?, ?, ?, ?, ?)");
-    const info = stmt.run(activity_id, name, whatsapp, guest_count || 1, status || 'Attending');
-    return NextResponse.json({ id: Number(info.lastInsertRowid), activity_id, name, whatsapp, guest_count: guest_count || 1, status: status || 'Attending' });
+    const created = await prisma.guest.create({
+      data: { activity_id: Number(activity_id), name, whatsapp, guest_count: guest_count || 1, status: status || "Attending" },
+    });
+    return NextResponse.json(created);
   }
   if (event_id) {
     if (!hasEventAccess(user, Number(event_id))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    const stmt = db.prepare("INSERT INTO Guest (event_id, name, whatsapp, guest_count, status) VALUES (?, ?, ?, ?, ?)");
-    const info = stmt.run(event_id, name, whatsapp, guest_count || 1, status || 'Attending');
-    return NextResponse.json({ id: Number(info.lastInsertRowid), event_id, name, whatsapp, guest_count: guest_count || 1, status: status || 'Attending' });
+    const created = await prisma.guest.create({
+      data: { event_id: Number(event_id), name, whatsapp, guest_count: guest_count || 1, status: status || "Attending" },
+    });
+    return NextResponse.json(created);
   }
   return NextResponse.json({ error: "Missing activity_id or event_id" }, { status: 400 });
 }
@@ -60,16 +62,20 @@ export async function PUT(request: Request) {
   const { id, name, whatsapp, guest_count, status } = body;
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
-  // Resolve event from guest's parent
-  const guest = db.prepare(`
-    SELECT g.event_id, a.event_id as activity_event_id
-    FROM Guest g LEFT JOIN Activity a ON g.activity_id = a.id WHERE g.id = ?
-  `).get(Number(id)) as any;
-  const eventId = guest?.event_id || guest?.activity_event_id;
+  const guest = await prisma.guest.findUnique({
+    where: { id: Number(id) },
+    select: { event_id: true, activity: { select: { event_id: true } } },
+  });
+  const eventId = guest?.event_id || guest?.activity?.event_id;
   if (!eventId || !hasEventAccess(user, Number(eventId))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const stmt = db.prepare("UPDATE Guest SET name = COALESCE(?, name), whatsapp = COALESCE(?, whatsapp), guest_count = COALESCE(?, guest_count), status = COALESCE(?, status) WHERE id = ?");
-  stmt.run(name ?? null, whatsapp ?? null, guest_count ?? null, status ?? null, Number(id));
+  const data: any = {};
+  if (name !== undefined) data.name = name;
+  if (whatsapp !== undefined) data.whatsapp = whatsapp;
+  if (guest_count !== undefined) data.guest_count = guest_count;
+  if (status !== undefined) data.status = status;
+
+  await prisma.guest.update({ where: { id: Number(id) }, data });
   return NextResponse.json({ success: true });
 }
 
@@ -81,13 +87,13 @@ export async function DELETE(request: Request) {
   const id = searchParams.get("id");
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
-  const guest = db.prepare(`
-    SELECT g.event_id, a.event_id as activity_event_id
-    FROM Guest g LEFT JOIN Activity a ON g.activity_id = a.id WHERE g.id = ?
-  `).get(Number(id)) as any;
-  const eventId = guest?.event_id || guest?.activity_event_id;
+  const guest = await prisma.guest.findUnique({
+    where: { id: Number(id) },
+    select: { event_id: true, activity: { select: { event_id: true } } },
+  });
+  const eventId = guest?.event_id || guest?.activity?.event_id;
   if (!eventId || !hasEventAccess(user, Number(eventId))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  db.prepare("DELETE FROM Guest WHERE id = ?").run(Number(id));
+  await prisma.guest.delete({ where: { id: Number(id) } });
   return NextResponse.json({ success: true });
 }

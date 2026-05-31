@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Inter, Roboto, Poppins, Playfair_Display, Open_Sans, Lato, Montserrat, Source_Sans_3, Nunito, Quicksand } from "next/font/google";
 import "./globals.css";
-import db from "@/lib/db";
+import prisma from "@/lib/prisma";
 import { cookies } from "next/headers";
 
 export const dynamic = 'force-dynamic';
@@ -124,24 +124,20 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     const cookieStore = await cookies();
     const sessionToken = cookieStore.get("session_token")?.value;
     if (sessionToken) {
-      const user = db.prepare(`
-        SELECT tm.name, tm.role, tm.force_password_change
-        FROM Session s JOIN TeamMember tm ON s.user_id = tm.id
-        WHERE s.token = ? AND s.expires_at > datetime('now')
-      `).get(sessionToken) as any;
-      if (user) currentUser = user;
+      const session = await prisma.session.findFirst({
+        where: { token: sessionToken, expires_at: { gt: new Date() } },
+        include: { user: { select: { name: true, role: true, force_password_change: true } } },
+      });
+      if (session) currentUser = session.user;
     }
   } catch {} // Ignore cookie/session errors on first load
 
   try {
-    const tableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='Settings'").get();
-    if (tableExists) {
-      const settings = db.prepare("SELECT * FROM Settings").all() as { key: string; value: string }[];
-      const config: Record<string, string> = {};
-      for (const s of settings) config[s.key] = s.value;
-      for (const [dbKey, cssVar] of Object.entries(DB_TO_CSS)) {
-        if (config[dbKey]) cssVars[cssVar] = config[dbKey];
-      }
+    const settings = await prisma.settings.findMany();
+    const config: Record<string, string> = {};
+    for (const s of settings) config[s.key] = s.value;
+    for (const [dbKey, cssVar] of Object.entries(DB_TO_CSS)) {
+      if (config[dbKey]) cssVars[cssVar] = config[dbKey];
     }
   } catch (e) {
     console.error("Failed to load settings from DB", e);
@@ -152,13 +148,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   let appTitle = "Savazar Agentic Events & Projects Platform";
   let logoPath = "/logo.png";
   try {
-    const t = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='Settings'").get();
-    if (t) {
-      const titleRow = db.prepare("SELECT value FROM Settings WHERE key='appTitle'").get() as { value: string } | undefined;
-      if (titleRow) appTitle = titleRow.value;
-      const logoRow = db.prepare("SELECT value FROM Settings WHERE key='logoUrl'").get() as { value: string } | undefined;
-      if (logoRow) logoPath = logoRow.value;
-    }
+    const titleRow = await prisma.settings.findUnique({ where: { key: "appTitle" } });
+    if (titleRow) appTitle = titleRow.value;
+    const logoRow = await prisma.settings.findUnique({ where: { key: "logoUrl" } });
+    if (logoRow) logoPath = logoRow.value;
   } catch {}
 
   const fontName = cssVars['--font-family'] || 'Inter';

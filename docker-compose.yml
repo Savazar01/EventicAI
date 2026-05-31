@@ -1,14 +1,33 @@
 services:
+  db:
+    image: pgvector/pgvector:pg17
+    container_name: eventic-db
+    environment:
+      POSTGRES_USER: eventic
+      POSTGRES_PASSWORD: eventic_secret
+      POSTGRES_DB: eventic
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eventic -d eventic"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   app:
     container_name: eventic-ai-container
     build: .
     ports:
-      - '3078:3000' # External port 3078 mapping to internal port 3000
-    volumes:
-      # Bind mount for existing prisma data (preserves user data)
-      - ./prisma:/app/prisma
-      - /app/node_modules
+      - "3078:3000"
+    depends_on:
+      db:
+        condition: service_healthy
     environment:
-      - DATABASE_URL=file:/app/prisma/dev.db
-      - PORT=3000
-      - NODE_ENV=production
+      DATABASE_URL: postgresql://eventic:eventic_secret@db:5432/eventic
+      PORT: 3000
+      NODE_ENV: production
+
+volumes:
+  pgdata:

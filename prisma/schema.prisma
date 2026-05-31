@@ -1,25 +1,38 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL") # Changed to use environment variable for flexibility
+  provider = "postgresql"
+}
+
+enum UserRole {
+  savadmin
+  event_manager
+  event_user
 }
 
 model Event {
-  id          Int        @id @default(autoincrement())
-  title       String
-  description String?
-  start_date  DateTime
-  end_date    DateTime
-  activities  Activity[]
+  id                Int             @id @default(autoincrement())
+  title             String
+  description       String?
+  start_date        DateTime
+  end_date          DateTime
+  location          String?
+  contact           String?
+  payment_bank_name       String?   @default("")
+  payment_account_number  String?   @default("")
+  payment_ifsc_code       String?   @default("")
+  payment_qr_code         String?   @default("")
+  event_budget            Float?
+  event_effort_hours      Float?
+  event_owner_id          Int?
+  event_owner             TeamMember? @relation("EventOwner", fields: [event_owner_id], references: [id])
+  activities              Activity[]
+  guests                  Guest[]
+  locations               EventLocation[]
+  columnConfigs           ColumnConfig[]
 }
 
 model Activity {
@@ -32,15 +45,145 @@ model Activity {
   title             String
   description       String?
   status            String     @default("backlog")
+  completed         Int        @default(0)
   start_date        DateTime
   end_date          DateTime
   location          String?
+  planned_start     DateTime?
+  planned_end       DateTime?
+  actual_end        DateTime?
+  assigned_owner_id Int?
+  progress_status   String?
+  completion_note   String?
+  completed_at      DateTime?
+  planned_effort_hours   Float?
+  actual_effort_hours    Float?
+  planned_budget         Float?
+  actual_budget          Float?
+  currency          String?
+  vendors           Vendor[]
+  guests            Guest[]
 }
 
+model Guest {
+  id           Int       @id @default(autoincrement())
+  event_id     Int?
+  activity_id  Int?
+  name         String
+  whatsapp     String?
+  guest_count  Int       @default(1)
+  status       String    @default("Attending")
+  event        Event?    @relation(fields: [event_id], references: [id])
+  activity     Activity? @relation(fields: [activity_id], references: [id])
+}
+
+model Vendor {
+  id            Int      @id @default(autoincrement())
+  activity_id   Int
+  business_name String
+  whatsapp      String?
+  services      String?
+  activity      Activity @relation(fields: [activity_id], references: [id])
+}
+
+model Settings {
+  key   String @id
+  value String
+}
+
+model EventLocation {
+  id          Int     @id @default(autoincrement())
+  event_id    Int
+  name        String
+  description String?
+  city        String  @default("")
+  state       String  @default("")
+  country     String  @default("")
+  zip_code    String  @default("")
+  event       Event   @relation(fields: [event_id], references: [id])
+}
+
+model TeamMember {
+  id                    Int      @id @default(autoincrement())
+  username              String   @unique
+  name                  String
+  whatsapp              String?
+  password              String?
+  role                  String   @default("event_user")
+  email                 String?
+  event_ids             String   @default("[]")
+  first_name            String   @default("")
+  last_name             String   @default("")
+  force_password_change Int      @default(1)
+  owned_events          Event[]  @relation("EventOwner")
+  sessions              Session[]
+}
+
+model BusinessContact {
+  id          Int    @id @default(autoincrement())
+  full_name   String @default("")
+  whatsapp    String @default("")
+  designation String @default("")
+}
+
+model PaymentInfo {
+  id             Int    @id @default(autoincrement())
+  bank_name      String @default("")
+  account_number String @default("")
+  ifsc_code      String @default("")
+  qr_code        String @default("")
+}
+
+model BusinessDetail {
+  id            Int    @id @default(autoincrement())
+  business_name String @default("")
+  address       String?
+  street        String?
+  location      String?
+  city          String?
+  state         String?
+  country       String?
+  email         String?
+  whatsapp      String?
+  website       String?
+  youtube       String?
+  linkedin      String?
+  facebook      String?
+  tiktok        String?
+  instagram     String?
+  zip_code      String @default("")
+  timezone      String @default("UTC")
+  language      String @default("English")
+}
+
+model ColumnConfig {
+  id        Int    @id @default(autoincrement())
+  event_id  Int
+  status_id String
+  label     String
+  color     String @default("#94a3b8")
+  sort_order Int   @default(0)
+  event     Event  @relation(fields: [event_id], references: [id])
+}
+
+model Session {
+  token      String     @id
+  user_id    Int
+  created_at DateTime   @default(now())
+  expires_at DateTime
+  user       TeamMember @relation(fields: [user_id], references: [id])
+}
 
 model Todo {
   id        Int      @id @default(autoincrement())
   title     String
   status    String   @default("backlog")
   createdAt DateTime @default(now())
+}
+
+model DocumentEmbedding {
+  id        Int    @id @default(autoincrement())
+  content   String
+  metadata  String?
+  embedding Unsupported("vector(1536)")
 }

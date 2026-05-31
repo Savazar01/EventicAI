@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import db from "@/lib/db";
+import prisma from "@/lib/prisma";
 import { verifyPassword, createSession } from "@/lib/auth";
 
 const SESSION_MAX_AGE = 7 * 24 * 60 * 60;
@@ -10,7 +10,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Username and password are required" }, { status: 400 });
   }
 
-  const user = db.prepare("SELECT id, username, name, role, password, force_password_change FROM TeamMember WHERE username = ?").get(username) as any;
+  const user = await prisma.teamMember.findUnique({
+    where: { username },
+    select: { id: true, username: true, name: true, role: true, password: true, force_password_change: true },
+  });
   if (!user || !user.password) {
     return NextResponse.json({ error: "Invalid username or password" }, { status: 401 });
   }

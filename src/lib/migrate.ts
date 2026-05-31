@@ -1,291 +1,129 @@
-import Database from "better-sqlite3";
-import path from "path";
+import prisma from "./prisma";
 import bcrypt from "bcryptjs";
+import { execSync } from "child_process";
 
-const db = new Database(path.join(process.cwd(), "prisma", "dev.db"));
+async function main() {
+  console.log("Enabling pgvector extension...");
+  await prisma.$executeRawUnsafe("CREATE EXTENSION IF NOT EXISTS vector");
 
-console.log("Migrating database...");
+  console.log("Running schema migration...");
+  execSync("npx prisma db push --config prisma/config.ts --accept-data-loss", { stdio: "inherit" });
 
-// Create tables if they don't already exist (non-destructive)
-db.exec(`
-  CREATE TABLE IF NOT EXISTS Event (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,
-    description TEXT,
-    start_date DATETIME NOT NULL,
-    end_date DATETIME NOT NULL,
-    location TEXT,
-    contact TEXT
-  );
+  console.log("Seeding database...");
 
-  CREATE TABLE IF NOT EXISTS Activity (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    event_id INTEGER NOT NULL,
-    parent_activity_id INTEGER,
-    title TEXT NOT NULL,
-    description TEXT,
-    status TEXT NOT NULL DEFAULT 'backlog',
-    completed INTEGER NOT NULL DEFAULT 0,
-    start_date DATETIME NOT NULL,
-    end_date DATETIME NOT NULL,
-    location TEXT,
-    planned_start DATETIME,
-    planned_end DATETIME,
-    actual_end DATETIME,
-    assigned_owner_id INTEGER,
-    FOREIGN KEY (event_id) REFERENCES Event(id),
-    FOREIGN KEY (parent_activity_id) REFERENCES Activity(id)
-  );
+  const settings: { key: string; value: string }[] = [
+    { key: "appTitle", value: "Savazar Agentic Events & Projects Platform" },
+    { key: "logoUrl", value: "/logo.png" },
+    { key: "brandColor", value: "#6771ab" },
+    { key: "llmEnabledOpenAI", value: "" },
+    { key: "llmEnabledAnthropic", value: "" },
+    { key: "llmEnabledOpenRouter", value: "" },
+    { key: "llmEnabledGemini", value: "true" },
+    { key: "llmEnabledGroq", value: "" },
+    { key: "llmEnabledOllama", value: "" },
+    { key: "llmEnabledLMStudio", value: "" },
+    { key: "colorPrimary", value: "#6771ab" },
+    { key: "colorPrimaryLight", value: "#8b93c5" },
+    { key: "colorPrimaryDark", value: "#4a5280" },
+    { key: "colorPrimaryContainer", value: "#eef0f7" },
+    { key: "colorOnPrimaryContainer", value: "#2d336b" },
+    { key: "colorSecondary", value: "#8b93c5" },
+    { key: "colorSecondaryContainer", value: "#f0f1fa" },
+    { key: "colorOnSecondaryContainer", value: "#3d4580" },
+    { key: "colorTertiary", value: "#c484b0" },
+    { key: "colorTertiaryContainer", value: "#fce4f0" },
+    { key: "colorAccent", value: "#ffcc00" },
+    { key: "colorCream", value: "#fefce8" },
+    { key: "colorSuccess", value: "#22c55e" },
+    { key: "colorWarning", value: "#f59e0b" },
+    { key: "colorError", value: "#ef4444" },
+    { key: "colorBackground", value: "#f8fafc" },
+    { key: "colorForeground", value: "#1e293b" },
+    { key: "colorCard", value: "#ffffff" },
+    { key: "colorCardForeground", value: "#1e293b" },
+    { key: "colorBorder", value: "#e2e8f0" },
+    { key: "colorOutline", value: "#cbd5e1" },
+    { key: "colorInput", value: "#e2e8f0" },
+    { key: "colorRing", value: "#6771ab" },
+    { key: "fontFamily", value: "Inter" },
+    { key: "fsPageTitle", value: "1.5rem" },
+    { key: "fsSectionHeading", value: "1.125rem" },
+    { key: "fsCardTitle", value: "0.875rem" },
+    { key: "fsSidebarItem", value: "0.75rem" },
+    { key: "fsFormLabel", value: "0.75rem" },
+    { key: "fsBodyText", value: "0.75rem" },
+    { key: "fsStatValue", value: "0.75rem" },
+    { key: "fsButtonText", value: "0.875rem" },
+    { key: "btnAddActivity", value: "Add Activity" },
+    { key: "btnMarkComplete", value: "Mark Complete" },
+    { key: "btnSave", value: "Save" },
+    { key: "btnDelete", value: "Delete" },
+    { key: "btnCloneEvent", value: "Copy" },
+    { key: "btnAddGuest", value: "Add Guest" },
+    { key: "btnAddVendor", value: "Add Vendor" },
+    { key: "btnCancel", value: "Cancel" },
+    { key: "btnEdit", value: "Edit" },
+    { key: "btnCreateEvent", value: "Create Event/Project" },
+    { key: "btnEditEvent", value: "Edit Event/Project" },
+    { key: "btnViewBoard", value: "View Board" },
+    { key: "llmModelOpenAI", value: "GPT-4o" },
+    { key: "llmModelAnthropic", value: "Claude 3.5 Sonnet" },
+    { key: "llmModelOpenRouter", value: "" },
+    { key: "llmModelGemini", value: "Gemini 1.5 Pro" },
+    { key: "llmModelGroq", value: "Llama 3 70B" },
+    { key: "llmModelOllama", value: "llama2" },
+    { key: "llmModelLMStudio", value: "" },
+    { key: "llmKeyOpenAI", value: "" },
+    { key: "llmKeyAnthropic", value: "" },
+    { key: "llmKeyOpenRouter", value: "" },
+    { key: "llmKeyGemini", value: "" },
+    { key: "llmKeyGroq", value: "" },
+    { key: "llmKeyOllama", value: "" },
+    { key: "llmKeyLMStudio", value: "" },
+  ];
 
-  CREATE TABLE IF NOT EXISTS Guest (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    event_id INTEGER,
-    activity_id INTEGER,
-    name TEXT NOT NULL,
-    whatsapp TEXT,
-    guest_count INTEGER DEFAULT 1,
-    status TEXT DEFAULT 'Attending',
-    FOREIGN KEY (event_id) REFERENCES Event(id),
-    FOREIGN KEY (activity_id) REFERENCES Activity(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS Vendor (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    activity_id INTEGER NOT NULL,
-    business_name TEXT NOT NULL,
-    whatsapp TEXT,
-    services TEXT,
-    FOREIGN KEY (activity_id) REFERENCES Activity(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS Settings (
-    key TEXT PRIMARY KEY,
-    value TEXT NOT NULL
-  );
-
-  CREATE TABLE IF NOT EXISTS EventLocation (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    event_id INTEGER NOT NULL,
-    name TEXT NOT NULL,
-    description TEXT,
-    FOREIGN KEY (event_id) REFERENCES Event(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS TeamMember (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT NOT NULL UNIQUE,
-    name TEXT NOT NULL,
-    whatsapp TEXT
-  );
-
-  CREATE TABLE IF NOT EXISTS BusinessContact (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    full_name TEXT NOT NULL DEFAULT '',
-    whatsapp TEXT DEFAULT '',
-    designation TEXT DEFAULT ''
-  );
-
-  CREATE TABLE IF NOT EXISTS PaymentInfo (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    bank_name TEXT DEFAULT '',
-    account_number TEXT DEFAULT '',
-    ifsc_code TEXT DEFAULT '',
-    qr_code TEXT DEFAULT ''
-  );
-
-  CREATE TABLE IF NOT EXISTS BusinessDetail (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    business_name TEXT NOT NULL DEFAULT '',
-    address TEXT DEFAULT '',
-    street TEXT DEFAULT '',
-    location TEXT DEFAULT '',
-    city TEXT DEFAULT '',
-    state TEXT DEFAULT '',
-    country TEXT DEFAULT '',
-    email TEXT DEFAULT '',
-    whatsapp TEXT DEFAULT '',
-    website TEXT DEFAULT '',
-    youtube TEXT DEFAULT '',
-    linkedin TEXT DEFAULT '',
-    facebook TEXT DEFAULT '',
-    tiktok TEXT DEFAULT '',
-    instagram TEXT DEFAULT '',
-    zip_code TEXT DEFAULT '',
-    timezone TEXT DEFAULT 'UTC',
-    language TEXT DEFAULT 'English'
-  );
-
-  CREATE TABLE IF NOT EXISTS ColumnConfig (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    event_id INTEGER NOT NULL,
-    status_id TEXT NOT NULL,
-    label TEXT NOT NULL,
-    color TEXT NOT NULL DEFAULT '#94a3b8',
-    sort_order INTEGER NOT NULL DEFAULT 0,
-    FOREIGN KEY (event_id) REFERENCES Event(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS Session (
-    token TEXT PRIMARY KEY,
-    user_id INTEGER NOT NULL,
-    created_at TEXT DEFAULT (datetime('now')),
-    expires_at TEXT NOT NULL,
-    FOREIGN KEY (user_id) REFERENCES TeamMember(id)
-  );
-`);
-
-// Seed default settings
-const defaults: [string, string][] = [
-  ['appTitle', 'Savazar Agentic Events & Projects Platform'],
-  ['logoUrl', '/logo.png'],
-  ['brandColor', '#6771ab'],
-  ['llmEnabledOpenAI', ''],
-  ['llmEnabledAnthropic', ''],
-  ['llmEnabledOpenRouter', ''],
-  ['llmEnabledGemini', 'true'],
-  ['llmEnabledGroq', ''],
-  ['llmEnabledOllama', ''],
-  ['llmEnabledLMStudio', ''],
-  // ---- Appearance Colors ----
-  ['colorPrimary', '#6771ab'],
-  ['colorPrimaryLight', '#8b93c5'],
-  ['colorPrimaryDark', '#4a5280'],
-  ['colorPrimaryContainer', '#eef0f7'],
-  ['colorOnPrimaryContainer', '#2d336b'],
-  ['colorSecondary', '#8b93c5'],
-  ['colorSecondaryContainer', '#f0f1fa'],
-  ['colorOnSecondaryContainer', '#3d4580'],
-  ['colorTertiary', '#c484b0'],
-  ['colorTertiaryContainer', '#fce4f0'],
-  ['colorAccent', '#ffcc00'],
-  ['colorCream', '#fefce8'],
-  ['colorSuccess', '#22c55e'],
-  ['colorWarning', '#f59e0b'],
-  ['colorError', '#ef4444'],
-  ['colorBackground', '#f8fafc'],
-  ['colorForeground', '#1e293b'],
-  ['colorCard', '#ffffff'],
-  ['colorCardForeground', '#1e293b'],
-  ['colorBorder', '#e2e8f0'],
-  ['colorOutline', '#cbd5e1'],
-  ['colorInput', '#e2e8f0'],
-  ['colorRing', '#6771ab'],
-  // ---- Font & Typography ----
-  ['fontFamily', 'Inter'],
-  ['fsPageTitle', '1.5rem'],
-  ['fsSectionHeading', '1.125rem'],
-  ['fsCardTitle', '0.875rem'],
-  ['fsSidebarItem', '0.75rem'],
-  ['fsFormLabel', '0.75rem'],
-  ['fsBodyText', '0.75rem'],
-  ['fsStatValue', '0.75rem'],
-  ['fsButtonText', '0.875rem'],
-  // ---- Button Labels ----
-  ['btnAddActivity', 'Add Activity'],
-  ['btnMarkComplete', 'Mark Complete'],
-  ['btnSave', 'Save'],
-  ['btnDelete', 'Delete'],
-  ['btnCloneEvent', 'Copy'],
-  ['btnAddGuest', 'Add Guest'],
-  ['btnAddVendor', 'Add Vendor'],
-  ['btnCancel', 'Cancel'],
-  ['btnEdit', 'Edit'],
-  ['btnCreateEvent', 'Create Event/Project'],
-  ['btnEditEvent', 'Edit Event/Project'],
-  ['btnViewBoard', 'View Board'],
-  // ---- AI Model Names ----
-  ['llmModelOpenAI', 'GPT-4o'],
-  ['llmModelAnthropic', 'Claude 3.5 Sonnet'],
-  ['llmModelOpenRouter', ''],
-  ['llmModelGemini', 'Gemini 1.5 Pro'],
-  ['llmModelGroq', 'Llama 3 70B'],
-  ['llmModelOllama', 'llama2'],
-  ['llmModelLMStudio', ''],
-  // ---- AI API Keys ----
-  ['llmKeyOpenAI', ''],
-  ['llmKeyAnthropic', ''],
-  ['llmKeyOpenRouter', ''],
-  ['llmKeyGemini', ''],
-  ['llmKeyGroq', ''],
-  ['llmKeyOllama', ''],
-  ['llmKeyLMStudio', ''],
-];
-for (const [k, v] of defaults) {
-  db.prepare("INSERT OR IGNORE INTO Settings (key, value) VALUES (?, ?)").run(k, v);
-}
-
-// Non-destructive column additions for databases created by older schema versions
-function addColumnIfMissing(table: string, column: string, definition: string) {
-  const cols = db.prepare(`PRAGMA table_info('${table}')`).all() as any[];
-  if (!cols.some((c: any) => c.name === column)) {
-    db.exec(`ALTER TABLE ${table} ADD COLUMN ${definition}`);
-    console.log(`  Added missing column ${table}.${column}`);
+  for (const s of settings) {
+    await prisma.settings.upsert({
+      where: { key: s.key },
+      update: { value: s.value },
+      create: { key: s.key, value: s.value },
+    });
   }
+
+  const existingAdmin = await prisma.teamMember.findUnique({ where: { username: "savadmin" } });
+  if (!existingAdmin) {
+    const hash = await bcrypt.hash("savadmin123", 12);
+    await prisma.teamMember.create({
+      data: { username: "savadmin", name: "Super Admin", role: "savadmin", password: hash, force_password_change: 1 },
+    });
+    console.log("  Created default savadmin user (password: savadmin123)");
+  }
+
+  const eventsWithoutColumns = await prisma.event.findMany({
+    where: { columnConfigs: { none: {} } },
+    select: { id: true },
+  });
+  for (const ev of eventsWithoutColumns) {
+    await prisma.columnConfig.createMany({
+      data: [
+        { event_id: ev.id, status_id: "backlog", label: "Backlog", color: "#6771ab", sort_order: 0 },
+        { event_id: ev.id, status_id: "in-progress", label: "In-Progress", color: "#c484b0", sort_order: 1 },
+      ],
+    });
+    console.log(`  Seeded default columns for event ${ev.id}`);
+  }
+
+  const legacyDoneCols = await prisma.columnConfig.findMany({
+    where: { status_id: "done", label: "Done", sort_order: 2 },
+  });
+  for (const c of legacyDoneCols) {
+    await prisma.columnConfig.delete({ where: { id: c.id } });
+    console.log(`  Removed legacy auto-seeded Done column (id=${c.id})`);
+  }
+
+  console.log("Seed complete.");
 }
 
-addColumnIfMissing('Guest', 'event_id', 'event_id INTEGER REFERENCES Event(id)');
-addColumnIfMissing('Guest', 'guest_count', 'guest_count INTEGER DEFAULT 1');
-addColumnIfMissing('Guest', 'status', 'status TEXT DEFAULT \'Attending\'');
-addColumnIfMissing('Activity', 'planned_start', 'planned_start DATETIME');
-addColumnIfMissing('Activity', 'planned_end', 'planned_end DATETIME');
-addColumnIfMissing('Activity', 'actual_end', 'actual_end DATETIME');
-addColumnIfMissing('Activity', 'assigned_owner_id', 'assigned_owner_id INTEGER');
-addColumnIfMissing('Activity', 'location', 'location TEXT');
-addColumnIfMissing('Activity', 'progress_status', "progress_status TEXT DEFAULT NULL");
-addColumnIfMissing('Activity', 'completion_note', "completion_note TEXT DEFAULT NULL");
-addColumnIfMissing('Activity', 'completed_at', "completed_at DATETIME DEFAULT NULL");
-addColumnIfMissing('Activity', 'planned_effort_hours', "planned_effort_hours REAL DEFAULT NULL");
-addColumnIfMissing('Activity', 'actual_effort_hours', "actual_effort_hours REAL DEFAULT NULL");
-addColumnIfMissing('Activity', 'planned_budget', "planned_budget REAL DEFAULT NULL");
-addColumnIfMissing('Activity', 'actual_budget', "actual_budget REAL DEFAULT NULL");
-addColumnIfMissing('Activity', 'currency', "currency TEXT DEFAULT NULL");
-addColumnIfMissing('Vendor', 'services', 'services TEXT');
-addColumnIfMissing('TeamMember', 'whatsapp', 'whatsapp TEXT');
-addColumnIfMissing('TeamMember', 'email', "email TEXT DEFAULT NULL");
-addColumnIfMissing('TeamMember', 'role', "role TEXT DEFAULT 'event_user'");
-addColumnIfMissing('TeamMember', 'event_ids', "event_ids TEXT DEFAULT '[]'");
-addColumnIfMissing('TeamMember', 'first_name', "first_name TEXT DEFAULT ''");
-addColumnIfMissing('TeamMember', 'last_name', "last_name TEXT DEFAULT ''");
-addColumnIfMissing('Event', 'payment_bank_name', "payment_bank_name TEXT DEFAULT ''");
-addColumnIfMissing('Event', 'payment_account_number', "payment_account_number TEXT DEFAULT ''");
-addColumnIfMissing('Event', 'payment_ifsc_code', "payment_ifsc_code TEXT DEFAULT ''");
-addColumnIfMissing('Event', 'payment_qr_code', "payment_qr_code TEXT DEFAULT ''");
-addColumnIfMissing('Event', 'event_budget', "event_budget REAL DEFAULT NULL");
-addColumnIfMissing('Event', 'event_effort_hours', "event_effort_hours REAL DEFAULT NULL");
-addColumnIfMissing('Event', 'event_owner_id', "event_owner_id INTEGER DEFAULT NULL REFERENCES TeamMember(id)");
-addColumnIfMissing('EventLocation', 'city', "city TEXT DEFAULT ''");
-addColumnIfMissing('EventLocation', 'state', "state TEXT DEFAULT ''");
-addColumnIfMissing('EventLocation', 'country', "country TEXT DEFAULT ''");
-addColumnIfMissing('EventLocation', 'zip_code', "zip_code TEXT DEFAULT ''");
-addColumnIfMissing('BusinessDetail', 'zip_code', 'zip_code TEXT DEFAULT \'\'');
-addColumnIfMissing('PaymentInfo', 'qr_code', 'qr_code TEXT DEFAULT \'\'');
-
-// Auth columns
-addColumnIfMissing('TeamMember', 'password', "password TEXT DEFAULT NULL");
-addColumnIfMissing('TeamMember', 'force_password_change', "force_password_change INTEGER DEFAULT 1");
-
-// Seed the default savadmin user if no admin exists
-const existingAdmin = db.prepare("SELECT id FROM TeamMember WHERE username = 'savadmin'").get() as any;
-if (!existingAdmin) {
-  const hash = bcrypt.hashSync('savadmin123', 12);
-  db.prepare("INSERT INTO TeamMember (username, name, role, password, force_password_change) VALUES (?, ?, ?, ?, ?)").run('savadmin', 'Super Admin', 'savadmin', hash, 1);
-  console.log('  Created default savadmin user (password: savadmin123)');
-}
-
-// Seed default columns for events that have none
-const eventsWithoutColumns = db.prepare("SELECT id FROM Event WHERE id NOT IN (SELECT DISTINCT event_id FROM ColumnConfig)").all() as any[];
-const insertCol = db.prepare("INSERT INTO ColumnConfig (event_id, status_id, label, color, sort_order) VALUES (?, ?, ?, ?, ?)");
-for (const ev of eventsWithoutColumns) {
-  insertCol.run(ev.id, 'backlog', 'Backlog', '#6771ab', 0);
-  insertCol.run(ev.id, 'in-progress', 'In-Progress', '#c484b0', 1);
-  console.log(`  Seeded default columns for event ${ev.id}`);
-}
-
-// Cleanup: remove legacy auto-seeded "Done" column (status_id='done', label='Done', sort_order=2)
-const legacyDoneCols = db.prepare("SELECT id FROM ColumnConfig WHERE status_id = 'done' AND label = 'Done' AND sort_order = 2").all() as any[];
-for (const c of legacyDoneCols) {
-  db.prepare("DELETE FROM ColumnConfig WHERE id = ?").run(c.id);
-  console.log(`  Removed legacy auto-seeded Done column (id=${c.id})`);
-}
-
-console.log("Migration complete.");
+main()
+  .catch((e) => { console.error(e); process.exit(1); })
+  .finally(() => process.exit(0));

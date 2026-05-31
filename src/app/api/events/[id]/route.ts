@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import db from "@/lib/db";
+import prisma from "@/lib/prisma";
 import { authenticate, hasEventAccess, requireRole } from "@/lib/auth";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -10,38 +10,69 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (err) return err;
   if (!hasEventAccess(user, eventId)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const event = db.prepare(`
-    SELECT e.*, tm.name as event_owner_name,
-      (SELECT COUNT(*) FROM Activity WHERE event_id = e.id AND parent_activity_id IS NULL) as parent_activity_count,
-      (SELECT COUNT(*) FROM Activity WHERE event_id = e.id AND parent_activity_id IS NOT NULL) as sub_activity_count,
-      (SELECT COUNT(*) FROM Guest WHERE event_id = e.id) as event_guest_count,
-      (SELECT COUNT(*) FROM Guest g JOIN Activity a ON g.activity_id = a.id WHERE a.event_id = e.id) as activity_guest_count,
-      (SELECT COALESCE(SUM(g.guest_count), 0) FROM Guest g LEFT JOIN Activity a ON g.activity_id = a.id WHERE (g.event_id = e.id OR a.event_id = e.id) AND g.status = 'Attending') as attending_total,
-      (SELECT COALESCE(SUM(g.guest_count), 0) FROM Guest g LEFT JOIN Activity a ON g.activity_id = a.id WHERE (g.event_id = e.id OR a.event_id = e.id) AND g.status = 'Maybe') as maybe_total,
-      (SELECT COALESCE(SUM(g.guest_count), 0) FROM Guest g LEFT JOIN Activity a ON g.activity_id = a.id WHERE (g.event_id = e.id OR a.event_id = e.id) AND g.status = 'No') as no_total,
-      (SELECT COALESCE(SUM(g.guest_count), 0) FROM Guest g LEFT JOIN Activity a ON g.activity_id = a.id WHERE (g.event_id = e.id OR a.event_id = e.id)) as total_guest_count,
-      (SELECT COUNT(*) FROM Vendor v JOIN Activity a ON v.activity_id = a.id WHERE a.event_id = e.id) as vendor_count,
-      (SELECT COALESCE(
-        '[' || GROUP_CONCAT(
-          '{"status":"' || cc.status_id || '","label":"' || REPLACE(cc.label, '"', '\\"') ||
-          '","color":"' || cc.color ||
-          '","open":' || COALESCE(a.open_cnt, 0) || ',"in_progress":' || COALESCE(a.ip_cnt, 0) || ',"done":' || COALESCE(a.done_cnt, 0) || '}'
-        , ',') || ']', '[]')
-        FROM ColumnConfig cc
-        LEFT JOIN (
-          SELECT a.status,
-            SUM(CASE WHEN (a.progress_status IS NULL OR a.progress_status = '') AND a.completed = 0 THEN 1 ELSE 0 END) as open_cnt,
-            SUM(CASE WHEN a.progress_status = 'in-progress' THEN 1 ELSE 0 END) as ip_cnt,
-            SUM(CASE WHEN a.progress_status = 'done' OR a.completed = 1 THEN 1 ELSE 0 END) as done_cnt
-          FROM Activity a WHERE a.event_id = e.id GROUP BY a.status
-        ) a ON a.status = cc.status_id
-        WHERE cc.event_id = e.id
-        ORDER BY cc.sort_order
-      ) as activity_status_breakdown
-    FROM Event e LEFT JOIN TeamMember tm ON e.event_owner_id = tm.id WHERE e.id = ?
-  `).get(eventId) as any;
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+    include: { event_owner: { select: { name: true } } },
+  });
+
   if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  return NextResponse.json(event);
+
+  const parentCount = await prisma.activity.count({ where: { event_id: eventId, parent_activity_id: null } });
+  const subCount = await prisma.activity.count({ where: { event_id: eventId, parent_activity_id: { not: null } } });
+
+  const attendingGuests = await prisma.guest.aggregate({
+    where: { OR: [{ event_id: eventId }, { activity: { event_id: eventId } }], status: "Attending" },
+    _sum: { guest_count: true },
+  });
+  const maybeGuests = await prisma.guest.aggregate({
+    where: { OR: [{ event_id: eventId }, { activity: { event_id: eventId } }], status: "Maybe" },
+    _sum: { guest_count: true },
+  });
+  const noGuests = await prisma.guest.aggregate({
+    where: { OR: [{ event_id: eventId }, { activity: { event_id: eventId } }], status: "No" },
+    _sum: { guest_count: true },
+  });
+  const totalGuests = await prisma.guest.aggregate({
+    where: { OR: [{ event_id: eventId }, { activity: { event_id: eventId } }] },
+    _sum: { guest_count: true },
+  });
+  const vendorCount = await prisma.vendor.count({ where: { activity: { event_id: eventId } } });
+  const guestCountAtEvent = await prisma.guest.count({ where: { event_id: eventId } });
+
+  const columns = await prisma.columnConfig.findMany({
+    where: { event_id: eventId },
+    orderBy: { sort_order: "asc" },
+  });
+
+  const columnStatuses = await Promise.all(columns.map(async (cc) => {
+    const openCnt = await prisma.activity.count({
+      where: { event_id: eventId, status: cc.status_id, completed: 0, OR: [{ progress_status: null }, { progress_status: "" }] },
+    });
+    const ipCnt = await prisma.activity.count({
+      where: { event_id: eventId, status: cc.status_id, progress_status: "in-progress" },
+    });
+    const doneCnt = await prisma.activity.count({
+      where: { event_id: eventId, status: cc.status_id, OR: [{ progress_status: "done" }, { completed: 1 }] },
+    });
+    return { status: cc.status_id, label: cc.label, color: cc.color, open: openCnt, in_progress: ipCnt, done: doneCnt };
+  }));
+
+  const result = {
+    ...event,
+    event_owner_name: event.event_owner?.name || null,
+    parent_activity_count: parentCount,
+    sub_activity_count: subCount,
+    event_guest_count: guestCountAtEvent,
+    activity_guest_count: parentCount,
+    attending_total: attendingGuests._sum.guest_count || 0,
+    maybe_total: maybeGuests._sum.guest_count || 0,
+    no_total: noGuests._sum.guest_count || 0,
+    total_guest_count: totalGuests._sum.guest_count || 0,
+    vendor_count: vendorCount,
+    activity_status_breakdown: columnStatuses,
+  };
+
+  return NextResponse.json(result);
 }
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -53,24 +84,24 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   if (!hasEventAccess(user, eventId)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await request.json();
-  const fields: string[] = [];
-  const values: any[] = [];
-  if (body.title !== undefined) { fields.push("title = ?"); values.push(body.title); }
-  if (body.description !== undefined) { fields.push("description = ?"); values.push(body.description); }
-  if (body.start_date !== undefined) { fields.push("start_date = ?"); values.push(body.start_date); }
-  if (body.end_date !== undefined) { fields.push("end_date = ?"); values.push(body.end_date); }
-  if (body.location !== undefined) { fields.push("location = ?"); values.push(body.location); }
-  if (body.contact !== undefined) { fields.push("contact = ?"); values.push(body.contact); }
-  if (body.event_budget !== undefined) { fields.push("event_budget = ?"); values.push(body.event_budget); }
-  if (body.event_effort_hours !== undefined) { fields.push("event_effort_hours = ?"); values.push(body.event_effort_hours); }
-  if (body.event_owner_id !== undefined) { fields.push("event_owner_id = ?"); values.push(body.event_owner_id); }
-  if (body.payment_bank_name !== undefined) { fields.push("payment_bank_name = ?"); values.push(body.payment_bank_name); }
-  if (body.payment_account_number !== undefined) { fields.push("payment_account_number = ?"); values.push(body.payment_account_number); }
-  if (body.payment_ifsc_code !== undefined) { fields.push("payment_ifsc_code = ?"); values.push(body.payment_ifsc_code); }
-  if (body.payment_qr_code !== undefined) { fields.push("payment_qr_code = ?"); values.push(body.payment_qr_code); }
-  if (fields.length === 0) return NextResponse.json({ error: "No fields to update" }, { status: 400 });
-  values.push(Number(id));
-  db.prepare(`UPDATE Event SET ${fields.join(", ")} WHERE id = ?`).run(...values);
+  const data: any = {};
+  if (body.title !== undefined) data.title = body.title;
+  if (body.description !== undefined) data.description = body.description;
+  if (body.start_date !== undefined) data.start_date = new Date(body.start_date);
+  if (body.end_date !== undefined) data.end_date = new Date(body.end_date);
+  if (body.location !== undefined) data.location = body.location;
+  if (body.contact !== undefined) data.contact = body.contact;
+  if (body.event_budget !== undefined) data.event_budget = body.event_budget;
+  if (body.event_effort_hours !== undefined) data.event_effort_hours = body.event_effort_hours;
+  if (body.event_owner_id !== undefined) data.event_owner_id = body.event_owner_id;
+  if (body.payment_bank_name !== undefined) data.payment_bank_name = body.payment_bank_name;
+  if (body.payment_account_number !== undefined) data.payment_account_number = body.payment_account_number;
+  if (body.payment_ifsc_code !== undefined) data.payment_ifsc_code = body.payment_ifsc_code;
+  if (body.payment_qr_code !== undefined) data.payment_qr_code = body.payment_qr_code;
+
+  if (Object.keys(data).length === 0) return NextResponse.json({ error: "No fields to update" }, { status: 400 });
+
+  await prisma.event.update({ where: { id: eventId }, data });
   return NextResponse.json({ success: true });
 }
 
@@ -82,68 +113,94 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   if (err) return err;
   if (user.role === "event_user") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const original = db.prepare("SELECT * FROM Event WHERE id = ?").get(eventId) as any;
+  const original = await prisma.event.findUnique({ where: { id: eventId } });
   if (!original) return NextResponse.json({ error: "Event not found" }, { status: 404 });
 
-  db.exec("PRAGMA foreign_keys = OFF");
   try {
-    const newEvent = db.prepare(
-      "INSERT INTO Event (title, description, start_date, end_date, location, contact, event_budget, event_effort_hours, event_owner_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-    ).run(`Copy of ${original.title}`, original.description, original.start_date, original.end_date, original.location, original.contact, original.event_budget, original.event_effort_hours, original.event_owner_id);
-    const newEventId = Number(newEvent.lastInsertRowid);
+    const newEvent = await prisma.event.create({
+      data: {
+        title: `Copy of ${original.title}`,
+        description: original.description,
+        start_date: original.start_date,
+        end_date: original.end_date,
+        location: original.location,
+        contact: original.contact,
+        event_budget: original.event_budget,
+        event_effort_hours: original.event_effort_hours,
+        event_owner_id: original.event_owner_id,
+      },
+    });
+    const newEventId = newEvent.id;
 
-    const cols = db.prepare("SELECT * FROM ColumnConfig WHERE event_id = ?").all(eventId) as any[];
+    const cols = await prisma.columnConfig.findMany({ where: { event_id: eventId } });
     for (const c of cols) {
-      db.prepare("INSERT INTO ColumnConfig (event_id, status_id, label, color, sort_order) VALUES (?, ?, ?, ?, ?)")
-        .run(newEventId, c.status_id, c.label, c.color, c.sort_order);
+      await prisma.columnConfig.create({
+        data: { event_id: newEventId, status_id: c.status_id, label: c.label, color: c.color, sort_order: c.sort_order },
+      });
     }
 
-    const locs = db.prepare("SELECT * FROM EventLocation WHERE event_id = ?").all(eventId) as any[];
+    const locs = await prisma.eventLocation.findMany({ where: { event_id: eventId } });
     for (const l of locs) {
-      db.prepare("INSERT INTO EventLocation (event_id, name, description, city, state, country, zip_code) VALUES (?, ?, ?, ?, ?, ?, ?)")
-        .run(newEventId, l.name, l.description, l.city, l.state, l.country, l.zip_code);
+      await prisma.eventLocation.create({
+        data: { event_id: newEventId, name: l.name, description: l.description, city: l.city || "", state: l.state || "", country: l.country || "", zip_code: l.zip_code || "" },
+      });
     }
 
-    const activities = db.prepare("SELECT * FROM Activity WHERE event_id = ?").all(eventId) as any[];
+    const activities = await prisma.activity.findMany({ where: { event_id: eventId } });
     const idMap: Record<number, number> = {};
     for (const a of activities) {
       if (!a.parent_activity_id) {
-        const r = db.prepare(
-          "INSERT INTO Activity (event_id, parent_activity_id, title, description, status, completed, start_date, end_date, location, planned_start, planned_end, actual_end, assigned_owner_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-        ).run(newEventId, null, a.title, a.description, a.status, a.completed, a.start_date, a.end_date, a.location, a.planned_start, a.planned_end, a.actual_end, a.assigned_owner_id);
-        idMap[a.id] = Number(r.lastInsertRowid);
+        const created = await prisma.activity.create({
+          data: {
+            event_id: newEventId, parent_activity_id: null,
+            title: a.title, description: a.description, status: a.status,
+            completed: a.completed, start_date: a.start_date, end_date: a.end_date,
+            location: a.location, planned_start: a.planned_start, planned_end: a.planned_end,
+            actual_end: a.actual_end, assigned_owner_id: a.assigned_owner_id,
+          },
+        });
+        idMap[a.id] = created.id;
       }
     }
     for (const a of activities) {
       if (a.parent_activity_id) {
         const newParentId = idMap[a.parent_activity_id];
         if (newParentId) {
-          const r = db.prepare(
-            "INSERT INTO Activity (event_id, parent_activity_id, title, description, status, completed, start_date, end_date, location, planned_start, planned_end, actual_end, assigned_owner_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-          ).run(newEventId, newParentId, a.title, a.description, a.status, a.completed, a.start_date, a.end_date, a.location, a.planned_start, a.planned_end, a.actual_end, a.assigned_owner_id);
-          idMap[a.id] = Number(r.lastInsertRowid);
+          const created = await prisma.activity.create({
+            data: {
+              event_id: newEventId, parent_activity_id: newParentId,
+              title: a.title, description: a.description, status: a.status,
+              completed: a.completed, start_date: a.start_date, end_date: a.end_date,
+              location: a.location, planned_start: a.planned_start, planned_end: a.planned_end,
+              actual_end: a.actual_end, assigned_owner_id: a.assigned_owner_id,
+            },
+          });
+          idMap[a.id] = created.id;
         }
       }
     }
 
-    const guests = db.prepare(`
-      SELECT g.* FROM Guest g
-      LEFT JOIN Activity a ON g.activity_id = a.id
-      WHERE g.event_id = ? OR a.event_id = ?
-    `).all(eventId, eventId) as any[];
+    const guests = await prisma.guest.findMany({
+      where: { OR: [{ event_id: eventId }, { activity: { event_id: eventId } }] },
+    });
     for (const g of guests) {
       const newActivityId = g.activity_id ? idMap[g.activity_id] : null;
       const newEventIdForGuest = g.event_id === eventId ? newEventId : g.event_id;
-      db.prepare("INSERT INTO Guest (event_id, activity_id, name, whatsapp, guest_count, status) VALUES (?, ?, ?, ?, ?, ?)")
-        .run(newEventIdForGuest, newActivityId, g.name, g.whatsapp, g.guest_count, g.status);
+      await prisma.guest.create({
+        data: {
+          event_id: newEventIdForGuest, activity_id: newActivityId,
+          name: g.name, whatsapp: g.whatsapp, guest_count: g.guest_count, status: g.status,
+        },
+      });
     }
 
-    const vendors = db.prepare("SELECT v.* FROM Vendor v JOIN Activity a ON v.activity_id = a.id WHERE a.event_id = ?").all(eventId) as any[];
+    const vendors = await prisma.vendor.findMany({ where: { activity: { event_id: eventId } } });
     for (const v of vendors) {
       const newActivityId = idMap[v.activity_id];
       if (newActivityId) {
-        db.prepare("INSERT INTO Vendor (activity_id, business_name, whatsapp, services) VALUES (?, ?, ?, ?)")
-          .run(newActivityId, v.business_name, v.whatsapp, v.services);
+        await prisma.vendor.create({
+          data: { activity_id: newActivityId, business_name: v.business_name, whatsapp: v.whatsapp, services: v.services },
+        });
       }
     }
 
@@ -151,8 +208,6 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   } catch (error) {
     console.error("Error cloning event:", error);
     return NextResponse.json({ success: false, error: "Failed to clone event" }, { status: 500 });
-  } finally {
-    db.exec("PRAGMA foreign_keys = ON");
   }
 }
 
@@ -165,18 +220,17 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   const roleErr = requireRole(user, ["savadmin", "event_manager"]);
   if (roleErr) return roleErr;
 
-  db.exec("PRAGMA foreign_keys = OFF");
   try {
-    db.prepare("DELETE FROM EventLocation WHERE event_id = ?").run(eventId);
-    db.prepare("DELETE FROM Guest WHERE event_id = ?").run(eventId);
-    db.prepare("DELETE FROM Activity WHERE event_id = ?").run(eventId);
-    db.prepare("DELETE FROM ColumnConfig WHERE event_id = ?").run(eventId);
-    db.prepare("DELETE FROM Event WHERE id = ?").run(eventId);
+    await prisma.vendor.deleteMany({ where: { activity: { event_id: eventId } } });
+    await prisma.guest.deleteMany({ where: { activity: { event_id: eventId } } });
+    await prisma.guest.deleteMany({ where: { event_id: eventId } });
+    await prisma.activity.deleteMany({ where: { event_id: eventId } });
+    await prisma.eventLocation.deleteMany({ where: { event_id: eventId } });
+    await prisma.columnConfig.deleteMany({ where: { event_id: eventId } });
+    await prisma.event.delete({ where: { id: eventId } });
   } catch (error) {
     console.error("Error deleting event:", error);
     return NextResponse.json({ success: false, error: "Failed to delete event" }, { status: 500 });
-  } finally {
-    db.exec("PRAGMA foreign_keys = ON");
   }
   return NextResponse.json({ success: true });
 }
