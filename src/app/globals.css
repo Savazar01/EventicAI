@@ -1,26 +1,126 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  --color-slate-200: #cbd5e1;
+  --color-slate-300: #94a3b8;
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    /* Primary (Violet) */
+    --brand-violet: #6771ab;
+    --brand-violet-light: #8b93c5;
+    --brand-violet-dark: #4a5280;
+    --brand-violet-container: #eef0f7;
+    --brand-on-violet-container: #2d336b;
+
+    /* Secondary */
+    --brand-secondary: #8b93c5;
+    --brand-secondary-container: #f0f1fa;
+    --brand-on-secondary-container: #3d4580;
+
+    /* Tertiary (Rose) */
+    --brand-rose: #c484b0;
+    --brand-rose-container: #fce4f0;
+
+    /* Accent */
+    --brand-yellow: #ffcc00;
+    --brand-cream: #fefce8;
+
+    /* Feedback */
+    --brand-success: #22c55e;
+    --brand-warning: #f59e0b;
+    --brand-error: #ef4444;
+
+    /* Neutral */
+    --background: #f8fafc;
+    --foreground: #1e293b;
+    --card: #ffffff;
+    --card-foreground: #1e293b;
+    --border: #cbd5e1;
+    --outline: #94a3b8;
+
+    /* Component defaults */
+    --primary: #6771ab;
+    --primary-foreground: #ffffff;
+    --radius: 1rem;
+    --input: #cbd5e1;
+    --ring: #6771ab;
+
+    /* shadcn/ui theme tokens */
+    --popover: #ffffff;
+    --popover-foreground: #1e293b;
+    --muted: #f1f5f9;
+    --muted-foreground: #64748b;
+    --accent: #eef0f7;
+    --accent-foreground: #2d336b;
+
+    /* Font & Typography */
+    --font-family: var(--font-inter);
+    --fs-page-title: 1.5rem;
+    --fs-section-heading: 1.125rem;
+    --fs-card-title: 0.875rem;
+    --fs-sidebar-item: 0.75rem;
+    --fs-form-label: 0.75rem;
+    --fs-body-text: 0.75rem;
+    --fs-stat-value: 0.75rem;
+    --fs-button-text: 0.875rem;
   }
 }
 
+/* User-configurable font-size overrides */
+.page-title { font-size: var(--fs-page-title) !important; }
+.section-heading { font-size: var(--fs-section-heading) !important; }
+.card-title { font-size: var(--fs-card-title) !important; }
+.sidebar-item { font-size: var(--fs-sidebar-item) !important; }
+.form-label { font-size: var(--fs-form-label) !important; }
+.body-text { font-size: var(--fs-body-text) !important; }
+.stat-value { font-size: var(--fs-stat-value) !important; }
+.btn-text { font-size: var(--fs-button-text) !important; }
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  @apply bg-[var(--background)] text-[var(--foreground)] antialiased;
+  font-family: var(--font-family);
+}
+
+/* Material 3 Styled Components */
+.kanban-board-container {
+  @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6;
+}
+
+.kanban-column {
+  @apply bg-slate-100/50 p-6 rounded-[var(--radius)] border border-slate-200 flex flex-col gap-4 min-h-[80vh];
+}
+
+.kanban-card {
+  background: #ffffff;
+  padding: 1.25rem;
+  border-radius: 1rem;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.08);
+  border: 1px solid #e2e8f0;
+  cursor: grab;
+  transition: all 0.2s;
+}
+.kanban-card:hover {
+  box-shadow: 0 4px 12px -2px rgb(0 0 0 / 0.12);
+  border-color: var(--brand-violet, #6771ab);
+}
+
+.drawer-content {
+  @apply w-[600px] sm:max-w-[600px] p-6 bg-white border-l shadow-2xl;
+}
+
+.btn-primary {
+  @apply bg-[var(--brand-violet)] text-white hover:bg-[var(--brand-violet)]/90 transition-colors rounded-xl px-4 py-2 font-medium shadow-sm;
 }

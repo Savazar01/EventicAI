@@ -1,0 +1,46 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL") # Changed to use environment variable for flexibility
+}
+
+model Event {
+  id          Int        @id @default(autoincrement())
+  title       String
+  description String?
+  start_date  DateTime
+  end_date    DateTime
+  activities  Activity[]
+}
+
+model Activity {
+  id                Int        @id @default(autoincrement())
+  event_id          Int
+  event             Event      @relation(fields: [event_id], references: [id])
+  parent_activity_id Int?
+  parent_activity   Activity?  @relation("SubActivities", fields: [parent_activity_id], references: [id])
+  sub_activities    Activity[] @relation("SubActivities")
+  title             String
+  description       String?
+  status            String     @default("backlog")
+  start_date        DateTime
+  end_date          DateTime
+  location          String?
+}
+
+
+model Todo {
+  id        Int      @id @default(autoincrement())
+  title     String
+  status    String   @default("backlog")
+  createdAt DateTime @default(now())
+}

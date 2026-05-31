@@ -1,0 +1,14 @@
+services:
+  app:
+    container_name: eventic-ai-container
+    build: .
+    ports:
+      - '3078:3000' # External port 3078 mapping to internal port 3000
+    volumes:
+      # Bind mount for existing prisma data (preserves user data)
+      - ./prisma:/app/prisma
+      - /app/node_modules
+    environment:
+      - DATABASE_URL=file:/app/prisma/dev.db
+      - PORT=3000
+      - NODE_ENV=production
