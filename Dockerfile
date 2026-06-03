@@ -17,5 +17,6 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/src/generated ./src/generated
 COPY --from=builder /app/src/lib ./src/lib
+COPY --from=builder /app/Documentation ./Documentation
 EXPOSE 3000
 CMD ["npm", "start"]
