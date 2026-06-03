@@ -104,12 +104,19 @@ export const POST = withErrorHandler(async (request: Request) => {
   const { title, description, start_date, end_date, location, contact, event_budget, event_effort_hours, event_owner_id, payment_bank_name, payment_account_number, payment_ifsc_code, payment_qr_code } = await request.json();
   const created = await prisma.event.create({
     data: {
-      title, description, start_date: new Date(start_date), end_date: new Date(end_date),
-      location, contact,
-      event_budget: event_budget ?? null, event_effort_hours: event_effort_hours ?? null,
+      title,
+      description,
+      start_date: start_date ? new Date(start_date) : new Date(),
+      end_date: end_date ? new Date(end_date) : new Date(),
+      location,
+      contact,
+      event_budget: event_budget ?? null,
+      event_effort_hours: event_effort_hours ?? null,
       event_owner_id: event_owner_id ?? null,
-      payment_bank_name: payment_bank_name ?? "", payment_account_number: payment_account_number ?? "",
-      payment_ifsc_code: payment_ifsc_code ?? "", payment_qr_code: payment_qr_code ?? "",
+      payment_bank_name: payment_bank_name ?? "",
+      payment_account_number: payment_account_number ?? "",
+      payment_ifsc_code: payment_ifsc_code ?? "",
+      payment_qr_code: payment_qr_code ?? "",
     },
   });
   return NextResponse.json(created);

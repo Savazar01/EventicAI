@@ -65,8 +65,8 @@ export async function POST(request: Request) {
         description: description || null,
         status: effectiveStatus,
         completed: completed ? 1 : 0,
-        start_date,
-        end_date,
+        start_date: start_date ? new Date(start_date) : new Date(),
+        end_date: end_date ? new Date(end_date) : new Date(),
         location: location || null,
         planned_start: planned_start || null,
         planned_end: planned_end || null,
@@ -103,12 +103,12 @@ export async function PUT(request: Request) {
   if (completed !== undefined) data.completed = completed ? 1 : 0;
   if (title !== undefined) data.title = title;
   if (description !== undefined) data.description = description;
-  if (start_date !== undefined) data.start_date = start_date;
-  if (end_date !== undefined) data.end_date = end_date;
-  if (location !== undefined) data.location = location;
-  if (planned_start !== undefined) data.planned_start = planned_start;
-  if (planned_end !== undefined) data.planned_end = planned_end;
-  if (actual_end !== undefined) data.actual_end = actual_end;
+  if (start_date !== undefined) data.start_date = start_date ? new Date(start_date) : undefined;
+  if (end_date !== undefined) data.end_date = end_date ? new Date(end_date) : undefined;
+  if (location !== undefined) data.location = location || null;
+  if (planned_start !== undefined) data.planned_start = planned_start ? new Date(planned_start) : null;
+  if (planned_end !== undefined) data.planned_end = planned_end ? new Date(planned_end) : null;
+  if (actual_end !== undefined) data.actual_end = actual_end ? new Date(actual_end) : null;
   if (assigned_owner_id !== undefined) data.assigned_owner_id = assigned_owner_id;
   if (planned_effort_hours !== undefined) data.planned_effort_hours = planned_effort_hours != null ? Number(planned_effort_hours) : null;
   if (planned_budget !== undefined) data.planned_budget = planned_budget != null ? Number(planned_budget) : null;
