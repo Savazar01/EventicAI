@@ -224,7 +224,6 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     await prisma.vendor.deleteMany({ where: { activity: { event_id: eventId } } });
     await prisma.guest.deleteMany({ where: { activity: { event_id: eventId } } });
     await prisma.guest.deleteMany({ where: { event_id: eventId } });
-    await prisma.activity.deleteMany({ where: { event_id: eventId, parent_activity_id: { not: null } } });
     await prisma.activity.deleteMany({ where: { event_id: eventId } });
     await prisma.eventLocation.deleteMany({ where: { event_id: eventId } });
     await prisma.columnConfig.deleteMany({ where: { event_id: eventId } });
