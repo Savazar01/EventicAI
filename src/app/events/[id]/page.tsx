@@ -1498,23 +1498,30 @@ export default function KanbanBoard() {
           </SheetHeader>
           <div className="flex-1 flex min-h-0">
             {/* Left Sidebar */}
-            <div className="w-10 flex flex-col border-r border-slate-200 bg-slate-50 pt-2">
-              {[
-                { id: 'details', icon: Save, label: '' },
-                { id: 'sub-activities', icon: List, label: '' },
-                { id: 'dates-location', icon: Calendar, label: '' },
-                { id: 'guests', icon: Users, label: '' },
-                { id: 'vendors', icon: Briefcase, label: '' },
-              ].map(item => (
-                <button key={item.id} onClick={() => setActiveActivitySection(item.id)}
-                  className={`flex items-center justify-center h-10 w-10 rounded-lg text-sm font-semibold transition-all ${
-                    activeActivitySection === item.id
-                      ? 'bg-[var(--brand-violet)] text-white shadow-sm'
-                      : 'text-slate-800 hover:bg-slate-100'
-                  }`}>
-                  <item.icon size={16} />
-                </button>
-              ))}
+            <div className={`${activitySidebarCollapsed ? 'w-14' : 'w-44'} shrink-0 border-r border-slate-200 bg-slate-50 flex flex-col transition-all duration-200`}>
+              <button onClick={() => setActivitySidebarCollapsed(!activitySidebarCollapsed)}
+                className="h-10 border-b border-slate-200 flex items-center justify-center hover:bg-slate-100 text-slate-600 shrink-0">
+                <Menu size={16} />
+              </button>
+              <div className="flex flex-col p-1.5 gap-0.5 flex-1">
+                {[
+                  { id: 'details', icon: Save, label: 'Details' },
+                  { id: 'sub-activities', icon: List, label: 'Sub-Activities' },
+                  { id: 'dates-location', icon: Calendar, label: 'Dates & Location' },
+                  { id: 'guests', icon: Users, label: 'Guests' },
+                  { id: 'vendors', icon: Briefcase, label: 'Vendors' },
+                ].map(item => (
+                  <button key={item.id} onClick={() => setActiveActivitySection(item.id)}
+                    className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                      activeActivitySection === item.id
+                        ? 'bg-[var(--brand-violet)] text-white shadow-sm'
+                        : 'text-slate-800 hover:bg-slate-100'
+                    }`}>
+                    <item.icon size={16} className="shrink-0" />
+                    {!activitySidebarCollapsed && <span className="truncate">{item.label}</span>}
+                  </button>
+                ))}
+              </div>
             </div>
             {/* Main Content */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -1584,21 +1591,81 @@ export default function KanbanBoard() {
               {/* Section: Sub-Activities */}
               {activeActivitySection === 'sub-activities' && (
                 <div className="space-y-4 pt-2 border-t border-slate-100">
-                  <div className="text-center py-6 text-sm text-slate-600 italic">Add sub-activities below. They will be created after the main activity is saved.</div>
+                  <div className="text-center py-4 text-sm text-slate-600 italic">Add sub-activities below. They will be created after the main activity is saved.</div>
                   <ul className="space-y-2">
                     {createSubItems.map((sub, idx) => (
                       <li key={idx} className="text-sm p-3 bg-white border border-slate-200 rounded-xl flex items-center justify-between gap-2 shadow-sm">
-                        <div className="flex items-start gap-2 flex-1 min-w-0">
-                          <span className="font-medium truncate">{sub.title}</span>
-                          {sub.description && <p className="text-xs text-slate-500 truncate">{sub.description}</p>}
+                        <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                          <span className="font-semibold text-slate-800">{sub.title}</span>
+                          {sub.description && <p className="text-xs text-slate-500">{sub.description}</p>}
+                          <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 text-xs text-slate-500">
+                            {sub.date && (
+                              <span>
+                                <Calendar size={11} className="inline mr-1" />
+                                {formatDate(sub.date, businessCountry)}
+                                {sub.time && <span className="ml-1 font-mono">{sub.time}</span>}
+                              </span>
+                            )}
+                            {sub.owner && (
+                              <span className="text-[var(--brand-violet)] font-medium">
+                                Owner: {eventTeamMembers.find((m: any) => m.id === sub.owner)?.name || 'Unknown'}
+                              </span>
+                            )}
+                          </div>
                         </div>
                         <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 hover:bg-red-50" style={{ color: 'var(--brand-error)' }} onClick={() => removeCreateSubItem(idx)}><Trash2 size={13} /></Button>
                       </li>
                     ))}
                   </ul>
-                  <div className="flex flex-wrap gap-2 pt-2">
-                    <Input value={createNewSubTitle} onChange={e => setCreateNewSubTitle(e.target.value)} placeholder="Sub-activity title..." className="bg-white border-slate-200 rounded-xl flex-1 min-w-[140px] text-sm" />
-                    <Button onClick={addCreateSubItem} className="rounded-xl bg-[var(--brand-secondary)] text-white px-4 py-2 text-sm font-semibold">Add Sub</Button>
+                  <div className="flex flex-col gap-2 pt-2 border-t border-slate-200 mt-4 pt-4">
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <Input
+                        value={createNewSubTitle}
+                        onChange={(e) => setCreateNewSubTitle(e.target.value)}
+                        placeholder="Sub-activity title..."
+                        className="bg-white border-slate-200 rounded-xl flex-1 text-sm"
+                      />
+                      <Input
+                        value={createNewSubDesc}
+                        onChange={(e) => setCreateNewSubDesc(e.target.value)}
+                        placeholder="Describe this sub-activity in detail — purpose, deliverables, and any relevant context..."
+                        className="bg-white border-slate-200 rounded-xl flex-1 text-sm"
+                      />
+                    </div>
+                    <div className="flex flex-wrap gap-2 items-center">
+                      <Input
+                        type="date"
+                        value={createNewSubDate}
+                        onChange={(e) => setCreateNewSubDate(e.target.value)}
+                        className="sm:max-w-36 w-full sm:w-auto border-slate-200 bg-white rounded-xl"
+                      />
+                      <TimePicker
+                        value={createNewSubTime}
+                        onChange={setCreateNewSubTime}
+                        className="sm:max-w-32 w-full sm:w-auto"
+                      />
+                      <select
+                        value={createNewSubDur}
+                        onChange={(e) => setCreateNewSubDur(e.target.value)}
+                        className="sm:max-w-32 w-full sm:w-auto rounded-xl border-slate-200 bg-white px-3 py-2 text-sm border shadow-sm"
+                      >
+                        {DURATION_OPTIONS.map(o => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
+                      <Button onClick={addCreateSubItem} className="rounded-xl bg-[var(--brand-secondary)] text-white px-5 py-2 text-sm font-semibold hover:brightness-90 transition-all">Add Sub</Button>
+                    </div>
+                    <div className="flex flex-wrap gap-2 items-center pt-1">
+                      <Select value={String(createNewSubOwner || '')} onValueChange={v => setCreateNewSubOwner(v ? Number(v) : null)}>
+                        <SelectTrigger className="bg-white border-slate-200 rounded-xl text-sm min-w-[180px]"><SelectValue placeholder="Assign owner...">{createNewSubOwner ? eventTeamMembers.find(m => m.id === createNewSubOwner)?.name || "Assign owner..." : "Assign owner..."}</SelectValue></SelectTrigger>
+                        <SelectContent side="bottom" sideOffset={8}>
+                          <SelectItem value="">Unassigned</SelectItem>
+                          {eventTeamMembers.map(m => (
+                            <SelectItem key={m.id} value={String(m.id)}>{m.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </div>
               )}

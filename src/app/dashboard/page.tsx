@@ -444,6 +444,7 @@ export default function Home() {
                 <div className="flex flex-col gap-1 p-2">
                   {[
                     { id: 'details', icon: FileText, label: 'Details' },
+                    { id: 'date-location', icon: Calendar, label: 'Date & Location' },
                     { id: 'team', icon: Users, label: 'Team' },
                     { id: 'guests', icon: Users, label: 'Guests' },
                     { id: 'budget', icon: DollarSign, label: 'Effort & Budget' },
@@ -580,53 +581,8 @@ export default function Home() {
                       </div>
                     </div>
                   </div>
-                )}
-
-                {activeSection === 'date-location' && (
-                  <div className="space-y-4 pt-2 border-t border-slate-100">
-                    <div>
-                      <label className="text-xs font-semibold uppercase tracking-widest text-slate-700 form-label mb-2 block">Event Dates</label>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <p className="text-xs text-slate-600 mb-1">Start Date</p>
-                          <Input type="date" value={formStartDate} onChange={e => setFormStartDate(e.target.value)} className="bg-white border-slate-300 rounded-xl text-sm" />
-                        </div>
-                        <div>
-                          <p className="text-xs text-slate-600 mb-1">End Date</p>
-                          <Input type="date" value={formEndDate} onChange={e => setFormEndDate(e.target.value)} className="bg-white border-slate-300 rounded-xl text-sm" />
-                        </div>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-semibold uppercase tracking-widest text-slate-700 form-label block">Locations</label>
-                      <p className="text-xs text-slate-600">Add venues with full address (City, State, Country, Zip Code)</p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                        <Input value={newLocName} onChange={e => setNewLocName(e.target.value)} placeholder="Venue name" className="bg-white border-slate-300 rounded-xl text-sm" />
-                        <Input value={newLocDesc} onChange={e => setNewLocDesc(e.target.value)} placeholder="Description" className="bg-white border-slate-300 rounded-xl text-sm" />
-                        <Input value={newLocCity} onChange={e => setNewLocCity(e.target.value)} placeholder="City" className="bg-white border-slate-300 rounded-xl text-sm" />
-                        <Input value={newLocState} onChange={e => setNewLocState(e.target.value)} placeholder="State" className="bg-white border-slate-300 rounded-xl text-sm" />
-                        <Input value={newLocCountry} onChange={e => setNewLocCountry(e.target.value)} placeholder="Country" className="bg-white border-slate-300 rounded-xl text-sm" />
-                        <Input value={newLocZipCode} onChange={e => setNewLocZipCode(e.target.value)} placeholder="Zip Code" className="bg-white border-slate-300 rounded-xl text-sm" />
-                        <Button onClick={addLocationToList} className="col-span-full shrink-0 gap-1 rounded-xl bg-[var(--brand-secondary)] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:brightness-90 transition-all"><Plus size={14} /> Add Location</Button>
-                      </div>
-                      <div className="border border-slate-200 rounded-xl divide-y overflow-hidden">
-                        {formLocations.length === 0 && <p className="text-xs text-slate-600 italic p-3 bg-[var(--brand-cream)]">No locations added yet.</p>}
-                        {formLocations.map((loc, idx) => (
-                          <div key={idx} className={`flex items-center justify-between p-3 text-sm ${idx % 2 === 0 ? 'bg-[var(--brand-cream)]' : 'bg-[var(--brand-violet-container)]'}`}>
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span style={{ color: 'var(--brand-secondary)' }}>📍</span>
-                              <span className="font-medium">{loc.name}</span>
-                              {loc.city && <span className="text-slate-700 text-xs">— {[loc.city, loc.state, loc.country, loc.zip_code].filter(Boolean).join(", ")}</span>}
-                            </div>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-red-50 rounded-lg shrink-0" style={{ color: 'var(--brand-error)' }} onClick={() => removeLocationFromList(idx)}>
-                              <X size={14} />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
+                )
+                }
 
                 {activeSection === 'guests' && (
                   <div className="space-y-3 pt-2 border-t border-slate-100">
