@@ -86,3 +86,9 @@ next-env.d.ts
 prisma/dev.db
 **/*.db
 **/*.db-journal
+
+# knowledge graph build artifacts
+/graphify-out/
+
+# test results
+/test-results/
