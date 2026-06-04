@@ -40,6 +40,9 @@ test('add activity to backlog', async ({ page }) => {
   await page.waitForSelector(`text=${title}`);
   const activityCard = page.locator(`text=${title}`);
   await expect(activityCard).toBeVisible();
+
+  // 6. Cleanup
+  await page.request.delete(`/api/events/${eventId}`);
 });
 
 test('auto-prompt columns setup on empty event board', async ({ page }) => {
@@ -68,4 +71,7 @@ test('auto-prompt columns setup on empty event board', async ({ page }) => {
   // 5. Verify the placeholder text is visible
   const noColsPlaceholder = page.locator('text=No columns configured.');
   await expect(noColsPlaceholder).toBeVisible();
+
+  // 6. Cleanup
+  await page.request.delete(`/api/events/${eventId}`);
 });
