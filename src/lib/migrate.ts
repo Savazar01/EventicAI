@@ -85,7 +85,7 @@ async function main() {
   for (const s of settings) {
     await prisma.settings.upsert({
       where: { key: s.key },
-      update: { value: s.value },
+      update: {},
       create: { key: s.key, value: s.value },
     });
   }

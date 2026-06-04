@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import { DndContext, closestCenter, DragEndEvent, useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
@@ -673,11 +673,22 @@ export default function KanbanBoard() {
   const [newColStatusId, setNewColStatusId] = useState("");
   const [newColColor, setNewColColor] = useState("#94a3b8");
   const [editingColId, setEditingColId] = useState<number | null>(null);
+  const hasAutoPromptedRef = useRef(false);
+
+  useEffect(() => {
+    hasAutoPromptedRef.current = false;
+  }, [eventId]);
 
   const fetchColumns = useCallback(async () => {
     const res = await fetch(`/api/columns?event_id=${eventId}`);
     const data = await res.json();
-    if (Array.isArray(data)) setColumns(data);
+    if (Array.isArray(data)) {
+      setColumns(data);
+      if (data.length === 0 && !hasAutoPromptedRef.current) {
+        hasAutoPromptedRef.current = true;
+        setIsColumnManagerOpen(true);
+      }
+    }
   }, [eventId]);
 
   const moveColumn = async (id: number, direction: -1 | 1) => {
