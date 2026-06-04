@@ -4,28 +4,28 @@ import Link from "next/link";
 import { useState } from "react";
 
 const FEATURES = [
-  { title: "Kanban Boards", description: "Drag-and-drop boards that adapt to any workflow. Manage events, projects, campaigns, and operations — all with the same flexible interface.", icon: "columns" },
-  { title: "Timeline View", description: "Visualize every milestone on an interactive timeline. Perfect for gantt-style planning across manufacturing, logistics, construction, and more.", icon: "timeline" },
-  { title: "Calendar View", description: "Switch to a calendar view to manage deadlines, sessions, and recurring tasks. Day, week, or month — your schedule, your way.", icon: "calendar" },
-  { title: "Customizable Workflows", description: "Tailor columns, statuses, and fields to match your process. From wedding planning to software releases — the board fits your industry.", icon: "sliders" },
-  { title: "Personalized Dashboards", description: "Every user gets a role-aware workspace. Assign events, filter by team, and personalize the UI to match your brand.", icon: "user-check" },
-  { title: "Multi-Industry Ready", description: "Event agencies, SMBs, enterprises, nonprofits — one platform adapts to your domain. Simple enough for a launch party, powerful enough for a product launch.", icon: "layers" },
+  { title: "Kanban for AI Transformation", description: "Track and manage your AI-First objectives visually. Prioritize AI projects, manage backlogs, and visualize progress from strategy to deployment.", icon: "columns" },
+  { title: "AI Roadmaps & Timeline", description: "Map out your long-term AI Transformation milestones. Schedule implementation phases, coordinate rollouts, and track dependencies visually.", icon: "timeline" },
+  { title: "Scheduled Workflows", description: "Plan team coordination, model evaluations, and launch deadlines on a unified calendar view. Ensure consistent tracking of recurring AI tasks.", icon: "calendar" },
+  { title: "Customizable Workflows", description: "Tailor columns, statuses, and fields to fit your organization's unique requirements. Scale processes from small teams to enterprise-wide operations.", icon: "sliders" },
+  { title: "Role-Aware Dashboards", description: "Provide customized workspaces for leadership, developers, and project leads. Keep alignment across all levels of the organization.", icon: "user-check" },
+  { title: "End-to-End Tracking", description: "One centralized foundation to track, plan, and measure the progress of your organization's AI Transformation and AI-First objectives.", icon: "layers" },
 ];
 
 const TECH_FEATURES = [
-  { title: "Build Apps with AI", description: "Create powerful applications through natural conversation. Our AI engine turns your ideas into functional tools — no coding required.", icon: "brain" },
+  { title: "Build Apps & Workflows with AI", description: "Create powerful agentic workflows and custom applications through natural conversation. Turn ideas into functional tools without coding.", icon: "brain" },
   { title: "Sovereign by Design", description: "Your data never leaves your infrastructure. Self-host on your own servers, VPC, or air-gapped environment. Zero third-party dependencies.", icon: "shield" },
-  { title: "Private & Secure", description: "End-to-end encryption, no telemetry, no analytics phoning home. Role-based access control with audit trails. Your intellectual property stays yours.", icon: "lock" },
-  { title: "For Users, SMBs & Enterprises", description: "Scale from a single user to thousands. Lightweight enough for a freelancer, robust enough for a Fortune 500 — all on the same platform.", icon: "users" },
-  { title: "Open & Extensible", description: "Fully customizable stack. Bring your own AI provider (OpenAI, Anthropic, Ollama, Groq), integrate via APIs, and extend with plugins.", icon: "cpu" },
+  { title: "End-to-End AI Foundation", description: "A robust foundation for businesses of all sizes to plan, track, and manage AI Transformation. Achieve your AI-First goals with structured coordination.", icon: "lock" },
+  { title: "Scale: Individuals to Enterprise", description: "Designed to scale seamlessly. Lightweight enough for individuals, powerful enough for SMBs, and secure enough for large Enterprises.", icon: "users" },
+  { title: "Open & Extensible", description: "Fully customizable stack. Bring your own AI provider (OpenAI, Anthropic, Ollama, Groq), integrate via APIs, and extend with custom plugins.", icon: "cpu" },
   { title: "One-Command Deploy", description: "Docker-based deployment with PostgreSQL persistence. Deploy on bare metal, VM, Kubernetes, or Raspberry Pi — it just works.", icon: "rocket" },
 ];
 
 const COMING_SOON = [
   { title: "WhatsApp Integration", description: "Connect your boards to WhatsApp. Receive updates, respond to tasks, and manage workflows directly from your messaging app.", icon: "message" },
   { title: "Agentic AI", description: "Intelligent agents that autonomously manage tasks, coordinate workflows, and make decisions based on your rules and preferences.", icon: "bot" },
-  { title: "Skills & Tools Engine", description: "Create and update custom AI skills and tools. Define capabilities, chain them into workflows, and watch your AI become an expert in your domain.", icon: "tool" },
-  { title: "MCP Integration", description: "Model Context Protocol support for seamless AI-to-tool communication. Connect your AI agents to any API, database, or service securely.", icon: "plug" },
+  { title: "Custom AI Skills & Tools", description: "Develop and deploy custom AI capabilities. Chain multiple skills into complex agentic workflows to meet application, analytics, and other operational needs.", icon: "tool" },
+  { title: "Model Context Protocol (MCP)", description: "Seamless AI-to-tool communication. Securely connect your local or cloud AI agents to any API, database, or software service.", icon: "plug" },
 ];
 
 function FeatureIcon({ name, className }: { name: string; className?: string }) {
@@ -94,7 +94,7 @@ export default function LandingPageClient({ appTitle, logoUrl }: LandingPageClie
   const [activeShowcaseTab, setActiveShowcaseTab] = useState<"dashboard" | "kanban" | "timeline" | "calendar">("dashboard");
 
   return (
-    <div className="min-h-screen text-slate-900 antialiased font-sans relative overflow-x-hidden" style={{ backgroundColor: 'var(--background, #f8fafc)' }}>
+    <div className="min-h-screen text-slate-900 antialiased relative overflow-x-hidden" style={{ backgroundColor: 'var(--background, #f8fafc)', fontFamily: 'var(--font-family)' }}>
       {/* Decorative background blobs - dynamic colors derived from CSS variables */}
       <div 
         className="absolute top-[-10%] left-[-15%] w-[60vw] h-[60vw] rounded-full blur-[120px] pointer-events-none animate-float-1 z-0" 
@@ -102,7 +102,7 @@ export default function LandingPageClient({ appTitle, logoUrl }: LandingPageClie
       />
       <div 
         className="absolute top-[10%] right-[-15%] w-[55vw] h-[55vw] rounded-full blur-[120px] pointer-events-none animate-float-2 z-0" 
-        style={{ backgroundColor: 'color-mix(in srgb, var(--brand-rose, #c484b0) 15%, transparent)' }}
+        style={{ backgroundColor: 'color-mix(in srgb, var(--brand-violet, #6771ab) 10%, transparent)' }}
       />
       <div 
         className="absolute bottom-[15%] left-[5%] w-[50vw] h-[50vw] rounded-full blur-[100px] pointer-events-none z-0" 
@@ -242,20 +242,18 @@ export default function LandingPageClient({ appTitle, logoUrl }: LandingPageClie
               Closed Beta · AI-First · Sovereign Platform
             </div>
             <h1 className="text-4xl sm:text-5xl lg:text-7xl font-extrabold tracking-tight text-slate-900 leading-tight">
-              Build Intelligent Apps with{" "}
+              Sovereign Platform for{" "}
               <span 
-                className="bg-clip-text text-transparent"
+                className="bg-clip-text text-transparent block sm:inline"
                 style={{ 
-                  backgroundImage: 'linear-gradient(to right, var(--brand-violet, #6771ab), var(--brand-violet-light, #8b93c5), var(--brand-rose, #c484b0))'
+                  backgroundImage: 'linear-gradient(to right, var(--brand-violet, #6771ab), var(--brand-violet-dark, #4a5280))'
                 }}
               >
-                {appTitle}
+                AI Transformation
               </span>
             </h1>
-            <p className="mt-8 text-base sm:text-lg lg:text-xl text-slate-600 max-w-2xl mx-auto leading-relaxed">
-              The sovereign, privacy-first AI platform for users, SMBs, and enterprises. 
-              Develop custom apps through natural conversation, deploy on your own infrastructure, 
-              and keep your data completely under your control. Selected beta access only.
+            <p className="mt-8 text-base sm:text-lg lg:text-xl text-slate-600 max-w-3xl mx-auto leading-relaxed">
+              The sovereign, end-to-end foundation for Individuals, SMBs, and Enterprises to plan, track, and manage their AI-First objectives. Combine visual Kanban workflows with Agentic AI and custom capabilities to build and develop workflows and apps tailored to your application, analytics, and operational needs.
             </p>
             <div className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-4 max-w-md mx-auto sm:max-w-none">
               <a 
@@ -394,8 +392,8 @@ export default function LandingPageClient({ appTitle, logoUrl }: LandingPageClie
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
               Flexible by Design
             </div>
-            <h2 className="text-3xl sm:text-5xl font-extrabold text-slate-900 tracking-tight">One Platform, Infinite Possibilities</h2>
-            <p className="mt-4 text-base sm:text-lg text-slate-600 leading-relaxed">Kanban, Timeline, and Calendar views that adapt to any industry — from event management to manufacturing, logistics to software development.</p>
+            <h2 className="text-3xl sm:text-5xl font-extrabold text-slate-900 tracking-tight">Visualize & Orchestrate Your Transition</h2>
+            <p className="mt-4 text-base sm:text-lg text-slate-600 leading-relaxed">Dynamic Kanban, Timeline, and Calendar views designed to support your end-to-end AI Transformation. Plan objectives, coordinate resources, and track progress across every business unit.</p>
           </div>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
@@ -456,8 +454,8 @@ export default function LandingPageClient({ appTitle, logoUrl }: LandingPageClie
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
               Sovereign & Secure
             </div>
-            <h2 className="text-3xl sm:text-5xl font-extrabold text-slate-900 tracking-tight">AI That Answers to You</h2>
-            <p className="mt-4 text-base sm:text-lg text-slate-600 leading-relaxed">Our core value proposition: build powerful apps with AI, deployed on your infrastructure, with sovereign data control, private by default, and secure by design.</p>
+            <h2 className="text-3xl sm:text-5xl font-extrabold text-slate-900 tracking-tight">AI That Answers and Works for You</h2>
+            <p className="mt-4 text-base sm:text-lg text-slate-600 leading-relaxed">We provide the framework for complete organizational transformation. Combine visual Kanban boards with Agentic AI to automate repetitive workflows, build customized analytics, and achieve your AI-First objectives under secure, sovereign data control.</p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
@@ -522,8 +520,8 @@ export default function LandingPageClient({ appTitle, logoUrl }: LandingPageClie
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
               Coming Soon
             </div>
-            <h2 className="text-3xl sm:text-5xl font-extrabold text-slate-900 tracking-tight">The Future Is Arriving</h2>
-            <p className="mt-4 text-base sm:text-lg text-slate-600 leading-relaxed">We are building the next generation of AI-powered productivity. Here is what is on the horizon.</p>
+            <h2 className="text-3xl sm:text-5xl font-extrabold text-slate-900 tracking-tight">Expanding the AI Transformation Engine</h2>
+            <p className="mt-4 text-base sm:text-lg text-slate-600 leading-relaxed">We are constantly extending our platform features to support advanced autonomous automation, analytics integrations, and messaging capabilities.</p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8 max-w-4xl mx-auto">
