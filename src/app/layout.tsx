@@ -202,7 +202,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               </details>
           </header>
         )}
-        <main className="flex-1 p-4 sm:p-6">{children}</main>
+        <main className={`flex-1 ${currentUser ? "p-4 sm:p-6" : ""}`}>{children}</main>
         {currentUser && (
           <footer className="border-t bg-white p-6 text-center text-sm text-slate-600">
               <div className="flex justify-center items-center gap-2">

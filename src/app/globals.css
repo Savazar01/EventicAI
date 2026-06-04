@@ -124,3 +124,41 @@ body {
 .btn-primary {
   @apply bg-[var(--brand-violet)] text-white hover:bg-[var(--brand-violet)]/90 transition-colors rounded-xl px-4 py-2 font-medium shadow-sm;
 }
+
+/* Custom UI-UX Pro Max Premium Animations */
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes float-slow {
+  0%, 100% {
+    transform: translate(0px, 0px) scale(1);
+  }
+  50% {
+    transform: translate(-20px, 15px) scale(1.08);
+  }
+}
+
+@keyframes float-medium {
+  0%, 100% {
+    transform: translate(0px, 0px) scale(1);
+  }
+  50% {
+    transform: translate(25px, -20px) scale(0.92);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 2.5s infinite;
+}
+
+.animate-float-1 {
+  animation: float-slow 15s ease-in-out infinite;
+}
+
+.animate-float-2 {
+  animation: float-medium 18s ease-in-out infinite;
+}
+
