@@ -36,6 +36,9 @@ The Admin panel (`/admin`) allows the **Savadmin** role to manage all aspects of
 | **Event Manager** | `event_manager` | Access to all events, manage activities/guests/vendors, but **no** access to Admin settings |
 | **Event User** | `event_user` | Access only to events explicitly assigned to them; cannot create or delete events |
 
+> [!IMPORTANT]
+> **Access Restrictions & Admin Authority**: The Admin panel and settings endpoints are strictly restricted to the **Savadmin** (`savadmin`) role. Any attempts by users with `event_manager` or `event_user` roles to access `/admin` or submit settings updates will result in a `403 Forbidden` error. Only the Platform Admin can add or remove team members, configure default payment information, customize appearance, or save AI provider API keys.
+
 ### Managing Team Members
 
 Navigate to **Admin > Team Management** to view, add, edit, or remove team members.
@@ -346,7 +349,8 @@ Within the Activity Details sheet:
 
 #### 5. Admin Settings (`/admin`)
 
-Accessible from the sidebar navigation (Savadmin only):
+> [!IMPORTANT]
+> **Admin Authorization Required**: The Settings workspace (`/admin`) is only accessible to users with the **Savadmin** (`savadmin`) role. Managers and regular users cannot view or edit these configurations.
 
 | Section | Configuration |
 |---------|--------------|
