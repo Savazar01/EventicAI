@@ -59,8 +59,36 @@ function MenuIcon() {
   );
 }
 
+const SHOWCASE_TABS = [
+  {
+    id: "dashboard" as const,
+    label: "Event Dashboard",
+    description: "Manage multiple campaigns and events in one unified space. Track progress, budgets, and effort status at a single glance.",
+    image: "/images/event-dashboard.png",
+  },
+  {
+    id: "kanban" as const,
+    label: "Kanban Board",
+    description: "Drag-and-drop activities and sub-activities through customized columns. Monitor assignments, WhatsApp statuses, and guest counts.",
+    image: "/images/kanban-board.png",
+  },
+  {
+    id: "timeline" as const,
+    label: "Timeline View",
+    description: "Map milestones, task sequences, and deadlines on an interactive horizontal timeline. Ideal for logistics and schedule tracking.",
+    image: "/images/timeline-view.png",
+  },
+  {
+    id: "calendar" as const,
+    label: "Calendar View",
+    description: "Plan monthly schedules, check deadlines, and coordinate client meetings on a fully-featured calendar display.",
+    image: "/images/calendar-view.png",
+  },
+];
+
 export default function LandingPage() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [activeShowcaseTab, setActiveShowcaseTab] = useState<"dashboard" | "kanban" | "timeline" | "calendar">("dashboard");
 
   return (
     <div className="min-h-screen bg-gradient-to-tr from-[#f8fafc] via-[#ffffff] to-[#f4f6fc] text-slate-900 antialiased font-sans relative overflow-x-hidden">
@@ -145,14 +173,68 @@ export default function LandingPage() {
               and keep your data completely under your control. Selected beta access only.
             </p>
             <div className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-4 max-w-md mx-auto sm:max-w-none">
-              <a href="#beta" className="relative overflow-hidden w-full sm:w-auto px-8 py-4 text-base font-semibold text-white rounded-xl shadow-lg bg-[#6771ab] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-[#6771ab]/20 active:scale-[0.97] text-center">
+              <a href="#beta" id="hero-cta-beta" className="relative overflow-hidden w-full sm:w-auto px-8 py-4 text-base font-semibold text-white rounded-xl shadow-lg bg-[#6771ab] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-[#6771ab]/20 active:scale-[0.97] text-center">
                 <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/15 to-transparent -translate-x-full animate-shimmer" />
                 Request Beta Access
               </a>
-              <a href="#features" className="w-full sm:w-auto px-8 py-4 text-base font-semibold text-slate-700 rounded-xl border border-slate-300 bg-white/70 backdrop-blur-sm shadow-sm hover:bg-white hover:-translate-y-0.5 hover:shadow-md hover:border-[#6771ab]/40 transition-all active:scale-[0.97] text-center">
-                Explore Features
+              <a href="#showcase" id="hero-cta-showcase" className="w-full sm:w-auto px-8 py-4 text-base font-semibold text-slate-700 rounded-xl border border-slate-300 bg-white/70 backdrop-blur-sm shadow-sm hover:bg-white hover:-translate-y-0.5 hover:shadow-md hover:border-[#6771ab]/40 transition-all active:scale-[0.97] text-center">
+                Explore Platform UI
               </a>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* App Showcase */}
+      <section id="showcase" className="relative pb-24 sm:pb-32 lg:pb-40 overflow-hidden z-10 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+        <div className="bg-white/40 backdrop-blur-md rounded-[2.5rem] border border-slate-200/50 p-6 sm:p-10 lg:p-12 shadow-2xl shadow-slate-100/50">
+          <div className="max-w-3xl mx-auto text-center mb-12">
+            <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold mb-4 bg-[#eef0f7] text-[#6771ab] border border-transparent shadow-sm">
+              App Preview
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">Experience EventicAI in Action</h2>
+            <p className="mt-4 text-base sm:text-lg text-slate-600">
+              Flip through our actual user interface to see how you can coordinate, track, and manage your operations.
+            </p>
+          </div>
+
+          {/* Tabs */}
+          <div className="flex flex-wrap items-center justify-center gap-2 mb-8 bg-slate-100/60 p-2 rounded-2xl max-w-2xl mx-auto">
+            {SHOWCASE_TABS.map((tab) => (
+              <button
+                key={tab.id}
+                id={`showcase-tab-${tab.id}`}
+                onClick={() => setActiveShowcaseTab(tab.id)}
+                className={`px-5 py-2.5 text-sm font-semibold rounded-xl transition-all cursor-pointer ${
+                  activeShowcaseTab === tab.id
+                    ? "bg-[#6771ab] text-white shadow-md shadow-[#6771ab]/25 scale-[1.02]"
+                    : "text-slate-600 hover:text-[#6771ab] hover:bg-white/50"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Tab Content */}
+          <div className="max-w-5xl mx-auto">
+            {SHOWCASE_TABS.map((tab) => {
+              if (tab.id !== activeShowcaseTab) return null;
+              return (
+                <div key={tab.id} className="space-y-6">
+                  <p className="text-center text-sm sm:text-base text-slate-600 max-w-2xl mx-auto leading-relaxed">
+                    {tab.description}
+                  </p>
+                  <div className="relative rounded-2xl overflow-hidden border border-slate-200 shadow-2xl bg-slate-50 aspect-[16/10]">
+                    <img
+                      src={tab.image}
+                      alt={tab.label}
+                      className="w-full h-full object-cover object-top hover:scale-[1.01] transition-transform duration-500"
+                    />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
